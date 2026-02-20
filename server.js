@@ -383,11 +383,18 @@ app.post('/api/logs/analyze', requireAuth, async (req, res) => {
       return text;
     }).join('\n\n---\n\n');
 
+    // Check Credits (cost is 2 credits)
+    if (req.user.profile.role !== 'ADMIN') {
+      if ((req.user.profile.credits || 0) < 2) {
+        return res.status(402).json({ error: "Insufficient credits. Analyzing chatlogs requires 2 credits." });
+      }
+    }
+
     const resolvedApiKey = process.env.OPENROUTER_API_KEY;
     if (!resolvedApiKey) return res.status(500).json({ error: 'System OpenRouter API key not configured for analysis.' });
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-4o',
+      model: 'openai/gpt-5.2',
       messages: [
         {
           role: 'system',
@@ -411,6 +418,12 @@ Please format nicely with headers and bullet points.`
     });
 
     const report = aiRes.data?.choices?.[0]?.message?.content || 'Unable to generate analysis at this time.';
+
+    // Deduct 2 credits
+    if (req.user.profile.role !== 'ADMIN') {
+      await supabase.from('profiles').update({ credits: (req.user.profile.credits || 0) - 2 }).eq('id', req.user.id);
+    }
+
     res.json({ success: true, report });
   } catch (e) {
     console.error('Analyze Logs Error:', e.message);
