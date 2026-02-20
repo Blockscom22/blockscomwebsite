@@ -761,8 +761,31 @@
             </div>
           </div>
         </div>
-        <label>Image URL (Optional)</label><input id="prod-image-url" class="input"
-          placeholder="https://example.com/image.jpg">
+
+        <label>Product Image (Optimized to 256x256)</label>
+        <div id="image-drop-zone"
+          style="border: 2px dashed var(--border); border-radius: 12px; padding: 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: background 0.2s, border-color 0.2s; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+          <input type="file" id="prod-image-file" accept="image/*"
+            style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;"
+            onchange="handleImageSelection(event)">
+          <div id="image-preview-container"
+            style="display: none; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
+            <img id="image-preview" src="" style="width: 100%; height: 100%; object-fit: cover;">
+          </div>
+          <div id="image-drop-text">
+            <div><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-dim); margin-bottom: 4px;">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg></div>
+            <span style="font-size: 0.85rem; color: var(--text); font-weight: 500;">Drag & Drop an image here</span>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">or click to browse. Max 5MB
+              (auto-compressed).</div>
+          </div>
+        </div>
+        <input type="hidden" id="prod-image-url">
+
         <label>Product Description (AI Context)</label>
         <textarea id="prod-description" class="input" style="min-height:120px"
           placeholder="Describe the product for the AI bot..."></textarea>
@@ -1075,6 +1098,12 @@
       document.getElementById('prod-description').value = '';
       document.getElementById('prod-image-url').value = '';
 
+      // Reset Image UI
+      document.getElementById('image-preview-container').style.display = 'none';
+      document.getElementById('image-drop-text').style.display = 'block';
+      document.getElementById('image-preview').src = '';
+      document.getElementById('prod-image-file').value = '';
+
       if (id !== null) {
         const { data, error } = await sb.from('products').select('*').eq('id', id).single();
         if (data && !error) {
@@ -1086,9 +1115,85 @@
           document.getElementById('prod-sell-bot').checked = data.hasOwnProperty('is_sellable') ? !!data.is_sellable : true;
           document.getElementById('prod-description').value = data.description || '';
           document.getElementById('prod-image-url').value = data.image_url || '';
+
+          if (data.image_url) {
+            document.getElementById('image-preview-container').style.display = 'block';
+            document.getElementById('image-drop-text').style.display = 'none';
+            document.getElementById('image-preview').src = data.image_url;
+          }
         }
       }
       document.getElementById('productModal').style.display = 'flex';
+    }
+
+    // Drag and Drop & Image Optimization
+    const dropZone = document.getElementById('image-drop-zone');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--primary)', false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--border)', false);
+    });
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files.length > 0) {
+        processImageFile(files[0]);
+      }
+    }
+
+    function handleImageSelection(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        processImageFile(e.target.files[0]);
+      }
+    }
+
+    function processImageFile(file) {
+      if (!file.type.match('image.*')) {
+        alert("Please only drop image files (JPG, PNG, WebP).");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Setup 256x256 target canvas
+          const TARGET_SIZE = 256;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = TARGET_SIZE;
+          canvas.height = TARGET_SIZE;
+
+          // Calculate aspect ratio crop (Cover)
+          const scale = Math.max(TARGET_SIZE / img.width, TARGET_SIZE / img.height);
+          const x = (TARGET_SIZE / scale - img.width) / 2;
+          const y = (TARGET_SIZE / scale - img.height) / 2;
+
+          ctx.drawImage(img, x, y, img.width, img.height, 0, 0, TARGET_SIZE, TARGET_SIZE);
+
+          // Generate ultra-compressed WebP string, fallback to JPEG
+          const dataUrl = canvas.toDataURL('image/webp', 0.8);
+
+          document.getElementById('prod-image-url').value = dataUrl;
+          document.getElementById('image-preview').src = dataUrl;
+          document.getElementById('image-preview-container').style.display = 'block';
+          document.getElementById('image-drop-text').style.display = 'none';
+        }
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
     }
 
     async function saveProduct() {
