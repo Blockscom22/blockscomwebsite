@@ -787,6 +787,21 @@
       await loadProducts();
       await syncProductsToKb(); // Sync with new currency labels
     }
+    let pagesCache = [];
+
+    async function syncProductsToKb() {
+      try {
+        const { data: kb } = await sb.from('knowledge_entries').select('*').eq('profile_id', me.id).eq('title', 'Product Catalog').single();
+        let products = [];
+        if (kb && kb.content) {
+          const jsonMatch = kb.content.match(/```json\n([\s\S]*?)\n```/);
+          if (jsonMatch) products = JSON.parse(jsonMatch[1]);
+        }
+        await updateInventoryKb(products);
+      } catch (e) {
+        console.error("syncProductsToKb failed", e);
+      }
+    }
 
     async function init() {
       const { data } = await sb.auth.getSession();
@@ -801,9 +816,11 @@
       document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
       if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
 
-      await syncProductsToKb();
-      await loadKbOptions();
       showView('pages');
+
+      // Load background tasks without blocking
+      syncProductsToKb();
+      loadKbOptions();
     }
 
     async function loadKbOptions() {
@@ -812,14 +829,23 @@
     }
 
     async function loadPages() {
-      const res = await fetch('/api/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
-      const pages = await res.json();
+      if (pagesCache.length > 0) renderPagesList();
+      try {
+        const res = await fetch('/api/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        pagesCache = await res.json();
+        renderPagesList();
+      } catch (e) {
+        console.error("Failed to load pages", e);
+      }
+    }
+
+    function renderPagesList() {
       const list = document.getElementById('pages-list');
-      if (pages.length === 0) {
+      if (pagesCache.length === 0) {
         list.innerHTML = '<div class="empty-state"><h3>No Automations Found</h3><p>Create your first Facebook Page webhook to get started.</p></div>';
         return;
       }
-      list.innerHTML = pages.map(p => `
+      list.innerHTML = pagesCache.map(p => `
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px">
             <div><div style="font-weight:700; font-size:1.1rem">${p.name}</div><div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">ID: ${p.fb_page_id}</div></div>
@@ -846,7 +872,12 @@
     }
 
     async function loadKb() {
+      if (kbOptions.length > 0) renderKbListBase();
       await loadKbOptions();
+      renderKbListBase();
+    }
+
+    function renderKbListBase() {
       const list = document.getElementById('kb-list');
       if (kbOptions.length === 0) {
         list.innerHTML = '<div class="empty-state"><h3>Your Knowledge is Empty</h3><p>Add skills to help the AI understand your business.</p></div>';
@@ -1105,15 +1136,23 @@
         ai_model: document.getElementById('p-model').value,
         knowledge_base: kbSelected
       };
-      const res = await fetch('/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) });
-      if (res.ok) {
-        closeModal('pageModal');
-        loadPages();
-        alert('Page updated successfully.');
+
+      closeModal('pageModal');
+
+      if (body.id) {
+        const idx = pagesCache.findIndex(p => p.id === body.id);
+        if (idx > -1) pagesCache[idx] = { ...pagesCache[idx], ...body };
       } else {
-        const err = await res.json().catch(() => ({}));
-        alert('Error saving page: ' + (err.error || 'unknown error'));
+        pagesCache.unshift({ ...body, id: 'temp-' + Date.now(), is_enabled: true, widget_key: 'Generating...' });
       }
+      renderPagesList();
+
+      fetch('/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) })
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to save');
+          loadPages();
+        })
+        .catch(err => alert('Error saving page: ' + err.message));
     }
 
     function openKbModal(id = null) {
@@ -1137,8 +1176,19 @@
         title: document.getElementById('kb-title').value,
         content: document.getElementById('kb-content').value
       };
-      await fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) });
-      closeModal('kbModal'); loadKb();
+
+      closeModal('kbModal');
+
+      if (body.id) {
+        const idx = kbOptions.findIndex(k => k.id === body.id);
+        if (idx > -1) kbOptions[idx] = { ...kbOptions[idx], ...body };
+      } else {
+        kbOptions.unshift({ ...body, id: 'temp-' + Date.now() });
+      }
+      renderKbListBase();
+
+      fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) })
+        .then(() => loadKb());
     }
 
     async function updatePassword() {
@@ -1164,8 +1214,21 @@
       loadAdminUsers();
     }
 
-    async function deletePage(id) { if (confirm('Delete automation?')) { await fetch('/api/pages/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }); loadPages(); } }
-    async function deleteKb(id) { if (confirm('Delete skill?')) { await fetch('/api/knowledge/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }); loadKb(); } }
+    async function deletePage(id) {
+      if (confirm('Delete automation?')) {
+        pagesCache = pagesCache.filter(p => p.id !== id);
+        renderPagesList();
+        fetch('/api/pages/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }).then(() => loadPages());
+      }
+    }
+
+    async function deleteKb(id) {
+      if (confirm('Delete skill?')) {
+        kbOptions = kbOptions.filter(k => k.id !== id);
+        renderKbListBase();
+        fetch('/api/knowledge/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }).then(() => loadKb());
+      }
+    }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
     async function logout() { await sb.auth.signOut(); window.location.href = '/login'; }
 
