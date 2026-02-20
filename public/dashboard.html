@@ -664,7 +664,8 @@
           required>
 
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
-          <div><label>Verify Token</label><input id="p-vtok" class="input" placeholder="Your secret phrase" required>
+          <div><label>Verify Token</label><input id="p-vtok" class="input" type="password"
+              placeholder="Your secret phrase">
           </div>
           <div>
             <label>AI Intelligence Model</label>
@@ -1200,8 +1201,11 @@
       document.getElementById('p-name').value = '';
       document.getElementById('p-id').value = '';
       document.getElementById('p-vtok').value = '';
+      document.getElementById('p-vtok').placeholder = 'Your secret phrase';
       document.getElementById('p-atok').value = '';
+      document.getElementById('p-atok').placeholder = 'EAAb...';
       document.getElementById('p-openrouter').value = '';
+      document.getElementById('p-openrouter').placeholder = 'sk-or-...';
 
       let selected = new Set();
 
@@ -1212,7 +1216,6 @@
         if (p) {
           document.getElementById('p-name').value = p.name;
           document.getElementById('p-id').value = p.fb_page_id;
-          document.getElementById('p-vtok').value = p.verify_token;
           let modelVal = p.ai_model || 'openai/gpt-4o';
           if (modelVal === 'openai/gpt-5.2') modelVal = 'openai/gpt-4o';
           if (modelVal === 'anthropic/claude-3-sonnet') modelVal = 'anthropic/claude-3.5-sonnet';
@@ -1220,10 +1223,13 @@
           document.getElementById('p-model').value = modelVal;
 
           // Never prefill secret inputs with masked values; keep blank and show saved state in placeholder
+          const vt = document.getElementById('p-vtok');
           const at = document.getElementById('p-atok');
           const ork = document.getElementById('p-openrouter');
+          vt.value = '';
           at.value = '';
           ork.value = '';
+          vt.placeholder = p.verify_token ? 'Saved (encrypted) — paste new token to replace' : 'Your secret phrase';
           at.placeholder = p.access_token ? 'Saved (encrypted) — paste new token to replace' : 'EAAb...';
           ork.placeholder = p.openrouter_key ? 'Saved (encrypted) — paste new key to replace' : 'sk-or-...';
 
@@ -1302,6 +1308,12 @@
     }
 
     async function savePage() {
+      const idStr = document.getElementById('p-id-hidden').value;
+      const vTok = document.getElementById('p-vtok').value;
+      if (!idStr && !vTok) {
+        alert('Verify Token is required for new webhooks.');
+        return;
+      }
       const kbSelected = Array.from(document.querySelectorAll('#kb-selector-list input:checked')).map(i => i.value);
       const prodSelected = Array.from(document.querySelectorAll('#product-selector-list input:checked')).map(i => i.value);
 
