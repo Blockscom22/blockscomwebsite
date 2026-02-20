@@ -542,8 +542,8 @@
               Currency</div>
             <select id="currency-selector" class="input" style="margin:0; width:100px; padding:8px"
               onchange="updateCurrency()">
-              <option value="USD">USD ($)</option>
               <option value="PHP">PHP (₱)</option>
+              <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
               <option value="GBP">GBP (£)</option>
               <option value="JPY">JPY (¥)</option>
@@ -665,9 +665,9 @@
           <div>
             <label>AI Intelligence Model</label>
             <select id="p-model" class="input">
-              <option value="openai/gpt-5.2">GPT-5.2 (High Reason)</option>
-              <option value="anthropic/claude-3-sonnet">Claude 3.5 Sonnet</option>
-              <option value="google/gemini-pro">Gemini 2.5 Pro</option>
+              <option value="openai/gpt-4o">GPT-4o (High Reason)</option>
+              <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+              <option value="google/gemini-2.5-pro">Gemini 2.5 Pro</option>
             </select>
           </div>
         </div>
@@ -761,14 +761,16 @@
     let currentSession = null;
     let me = null;
     let kbOptions = [];
-    let exchangeRates = { USD: 1 };
-    let displayCurrency = 'USD';
+    let exchangeRates = { USD: 1, PHP: 1 };
+    let displayCurrency = 'PHP';
 
     async function loadRates() {
       try {
         const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
         const data = await res.json();
         exchangeRates = data.rates;
+        // Make sure the dropdown reflects the initial variable in case it missed it
+        document.getElementById('currency-selector').value = displayCurrency;
         document.getElementById('currency-rate-info').innerText = `Live Rates: 1 USD = ${exchangeRates[displayCurrency] || 1} ${displayCurrency} (Updated: ${new Date().toLocaleTimeString()})`;
       } catch (e) { console.error("Rate fetch failed:", e); }
     }
@@ -807,6 +809,9 @@
       const { data } = await sb.auth.getSession();
       if (!data.session) { window.location.href = '/login'; return; }
       currentSession = data.session;
+
+      await loadRates();
+      document.getElementById('price-th').innerText = `Price (${displayCurrency})`;
 
       // Render structure instantly, start background tasks
       showView('pages');
@@ -1111,7 +1116,11 @@
           document.getElementById('p-name').value = p.name;
           document.getElementById('p-id').value = p.fb_page_id;
           document.getElementById('p-vtok').value = p.verify_token;
-          document.getElementById('p-model').value = p.ai_model || 'openai/gpt-5.2';
+          let modelVal = p.ai_model || 'openai/gpt-4o';
+          if (modelVal === 'openai/gpt-5.2') modelVal = 'openai/gpt-4o';
+          if (modelVal === 'anthropic/claude-3-sonnet') modelVal = 'anthropic/claude-3.5-sonnet';
+          if (modelVal === 'google/gemini-pro') modelVal = 'google/gemini-2.5-pro';
+          document.getElementById('p-model').value = modelVal;
 
           // Never prefill secret inputs with masked values; keep blank and show saved state in placeholder
           const at = document.getElementById('p-atok');

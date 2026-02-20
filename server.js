@@ -285,7 +285,7 @@ app.get('/api/widget/config', async (req, res) => {
 
   if (error || !page || !page.is_enabled) return res.status(404).json({ error: 'widget not found' });
 
-  res.json({ ok: true, pageName: page.name, model: page.ai_model || 'openai/gpt-5.2' });
+  res.json({ ok: true, pageName: page.name, model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o') });
 });
 
 app.post('/api/widget/message', async (req, res) => {
@@ -332,7 +332,7 @@ app.post('/api/widget/message', async (req, res) => {
     if (!resolvedApiKey) return res.status(500).json({ error: 'missing OpenRouter key' });
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: page.ai_model || 'openai/gpt-5.2',
+      model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'),
       messages: [
         { role: 'system', content: `You are Blockscom website assistant for ${page.name}. Use this knowledge base:\n${context}${productCatalog}` },
         { role: 'user', content: String(message) }
@@ -442,7 +442,7 @@ async function processMessage(event, fbPageId) {
     const aiRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: page.ai_model || 'openai/gpt-5.2', // Fallback model
+        model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'), // Fallback model
         messages: [
           {
             role: 'system',
