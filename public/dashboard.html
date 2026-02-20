@@ -916,8 +916,8 @@
             <code id="snippet-code-${p.id}" style="font-size:0.75rem; color:var(--text-muted); word-break:break-all">&lt;script src="${window.location.origin}/blockscom-chat.js" data-key="${p.widget_key || ''}" data-theme="default" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px">
-            <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base || []).length})</div>
-            <div style="font-size:0.8rem; color:var(--text-muted)">${(p.knowledge_base && p.knowledge_base.length) ? p.knowledge_base.slice(0, 3).join(', ') + (p.knowledge_base.length > 3 ? ' ...' : '') : 'No skills linked yet'}</div>
+            <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base || []).filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).length})</div>
+            <div style="font-size:0.8rem; color:var(--text-muted)">${(p.knowledge_base && p.knowledge_base.length) ? p.knowledge_base.filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).slice(0, 3).join(', ') + (p.knowledge_base.length > 3 ? ' ...' : '') : 'No skills linked yet'}</div>
           </div>
           <div style="display:flex; gap:10px">
             <button class="btn btn-secondary" style="flex:1" onclick="openPageModal('${p.id}')">Edit Config</button>
@@ -1205,7 +1205,15 @@
       document.getElementById('p-atok').value = '';
       document.getElementById('p-atok').placeholder = 'EAAb...';
       document.getElementById('p-openrouter').value = '';
-      document.getElementById('p-openrouter').placeholder = 'sk-or-...';
+      document.getElementById('p-vtok').readOnly = false;
+      document.getElementById('p-atok').readOnly = false;
+      document.getElementById('p-openrouter').readOnly = false;
+      document.getElementById('p-vtok').style.opacity = '1';
+      document.getElementById('p-atok').style.opacity = '1';
+      document.getElementById('p-openrouter').style.opacity = '1';
+      document.getElementById('p-vtok').style.cursor = 'text';
+      document.getElementById('p-atok').style.cursor = 'text';
+      document.getElementById('p-openrouter').style.cursor = 'text';
 
       let selected = new Set();
 
@@ -1229,9 +1237,13 @@
           vt.value = '';
           at.value = '';
           ork.value = '';
-          vt.placeholder = p.verify_token ? 'Saved (encrypted) — paste new token to replace' : 'Your secret phrase';
-          at.placeholder = p.access_token ? 'Saved (encrypted) — paste new token to replace' : 'EAAb...';
-          ork.placeholder = p.openrouter_key ? 'Saved (encrypted) — paste new key to replace' : 'sk-or-...';
+          vt.placeholder = p.verify_token ? 'Locked (Saved)' : 'Your secret phrase';
+          at.placeholder = p.access_token ? 'Locked (Saved)' : 'EAAb...';
+          ork.placeholder = p.openrouter_key ? 'Locked (Saved)' : 'sk-or-...';
+
+          if (p.verify_token) { vt.readOnly = true; vt.style.opacity = '0.6'; vt.style.cursor = 'not-allowed'; }
+          if (p.access_token) { at.readOnly = true; at.style.opacity = '0.6'; at.style.cursor = 'not-allowed'; }
+          if (p.openrouter_key) { ork.readOnly = true; ork.style.opacity = '0.6'; ork.style.cursor = 'not-allowed'; }
 
           selected = new Set(p.knowledge_base || []);
         }
@@ -1314,6 +1326,9 @@
         alert('Verify Token is required for new webhooks.');
         return;
       }
+
+      const aTok = document.getElementById('p-atok').value;
+      const orTok = document.getElementById('p-openrouter').value;
       const kbSelected = Array.from(document.querySelectorAll('#kb-selector-list input:checked')).map(i => i.value);
       const prodSelected = Array.from(document.querySelectorAll('#product-selector-list input:checked')).map(i => i.value);
 
@@ -1323,9 +1338,9 @@
         id: document.getElementById('p-id-hidden').value || undefined,
         name: document.getElementById('p-name').value,
         fb_page_id: document.getElementById('p-id').value,
-        verify_token: document.getElementById('p-vtok').value,
-        access_token: document.getElementById('p-atok').value,
-        openrouter_key: document.getElementById('p-openrouter').value,
+        verify_token: vTok || undefined, // If locked/blank, server logic ignores it
+        access_token: aTok || undefined,
+        openrouter_key: orTok || undefined,
         ai_model: document.getElementById('p-model').value,
         knowledge_base: combinedSelections
       };

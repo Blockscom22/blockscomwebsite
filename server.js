@@ -19,7 +19,15 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js') || path.endsWith('.css') || path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // Load Env
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -415,7 +423,18 @@ app.post('/api/widget/message', async (req, res) => {
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
       model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'),
       messages: [
-        { role: 'system', content: `You are Blockscom website assistant for ${page.name}. Use this knowledge base:\n${context}${productCatalog}` },
+        {
+          role: 'system', content: `You are Blockscom website assistant for ${page.name}. 
+
+KNOWLEDGE BASE:
+${context}
+${productCatalog}
+
+INSTRUCTIONS:
+- Answer directly based on the knowledge base and product catalog.
+- IMPORTANT: When listing products, format them using Markdown (e.g., bullet points and **bold** text) for better readability.
+- Add line breaks between distinct items so it does not look like a wall of text.
+- Be polite and professional.` },
         { role: 'user', content: String(message) }
       ]
     }, { headers: { 'Authorization': `Bearer ${resolvedApiKey}` } });
@@ -563,6 +582,7 @@ async function processMessage(event, fbPageId) {
             INSTRUCTIONS:
             - Answer based on the knowledge base and product catalog if relevant.
             - If a user asks about products or pricing, ONLY recommend the specific items listed in the PRODUCT CATALOG above. Do not invent products.
+            - IMPORTANT: When listing products, use clear formatting (bullet points, double newlines for spacing, and asterisks for basic bolding) to organize the text neatly.
             - Be polite and professional.
             - Keep answers concise for chat.
             `

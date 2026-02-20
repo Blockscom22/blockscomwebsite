@@ -110,7 +110,16 @@
   function push(role, text) {
     const row = document.createElement('div');
     row.className = 'bc-row ' + (role === 'user' ? 'bc-user' : 'bc-bot');
-    row.textContent = text;
+    if (role === 'bot') {
+      // Convert basic markdown: bold, newlines
+      let html = text
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;') // Sanitize
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br/>');
+      row.innerHTML = html;
+    } else {
+      row.textContent = text;
+    }
     msgs.appendChild(row);
     msgs.scrollTop = msgs.scrollHeight;
   }
