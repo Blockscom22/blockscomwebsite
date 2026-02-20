@@ -807,32 +807,44 @@
       const { data } = await sb.auth.getSession();
       if (!data.session) { window.location.href = '/login'; return; }
       currentSession = data.session;
-      const res = await fetch('/api/me', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
-      if (!res.ok) { logout(); return; }
-      me = await res.json();
 
-      document.getElementById('u-email').innerText = me.email;
-      document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
-      document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
-      if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
-
+      // Render structure instantly, start background tasks
       showView('pages');
 
-      // Load background tasks without blocking
-      syncProductsToKb();
-      loadKbOptions();
+      // Fetch user profile asynchronously and populate
+      fetch('/api/me', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } })
+        .then(async res => {
+          if (!res.ok) { logout(); return; }
+          me = await res.json();
+
+          document.getElementById('u-email').innerText = me.email;
+          document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
+          document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
+          if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+
+          syncProductsToKb();
+        })
+        .catch(console.error);
     }
+
+    let pagesLoaded = false;
+    let kbLoaded = false;
 
     async function loadKbOptions() {
       const res = await fetch('/api/knowledge', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
       kbOptions = await res.json();
+      kbLoaded = true;
     }
 
     async function loadPages() {
-      if (pagesCache.length > 0) renderPagesList();
+      if (pagesLoaded) {
+        renderPagesList();
+        return; // Don't re-fetch on every toggle if already loaded
+      }
       try {
         const res = await fetch('/api/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
         pagesCache = await res.json();
+        pagesLoaded = true;
         renderPagesList();
       } catch (e) {
         console.error("Failed to load pages", e);
@@ -841,6 +853,10 @@
 
     function renderPagesList() {
       const list = document.getElementById('pages-list');
+      if (!pagesLoaded) {
+        list.innerHTML = '<div class="empty-state"><h3>Loading Automations...</h3><p style="opacity:0.6; margin-top:8px;">Fetching your latest configurations</p></div>';
+        return;
+      }
       if (pagesCache.length === 0) {
         list.innerHTML = '<div class="empty-state"><h3>No Automations Found</h3><p>Create your first Facebook Page webhook to get started.</p></div>';
         return;
@@ -872,13 +888,20 @@
     }
 
     async function loadKb() {
-      if (kbOptions.length > 0) renderKbListBase();
+      if (kbLoaded) {
+        renderKbListBase();
+        return; // Don't re-fetch on every toggle if already loaded
+      }
       await loadKbOptions();
       renderKbListBase();
     }
 
     function renderKbListBase() {
       const list = document.getElementById('kb-list');
+      if (!kbLoaded) {
+        list.innerHTML = '<div class="empty-state"><h3>Loading Knowledge Base Skills...</h3></div>';
+        return;
+      }
       if (kbOptions.length === 0) {
         list.innerHTML = '<div class="empty-state"><h3>Your Knowledge is Empty</h3><p>Add skills to help the AI understand your business.</p></div>';
         return;
