@@ -443,7 +443,7 @@ INSTRUCTIONS:
 
     await supabase.from('activity_logs').insert([{ fb_page_id: page.id, type: 'WIDGET_REPLY', payload: { in: message, out: reply } }]);
 
-    res.json({ ok: true, reply });
+    res.json({ ok: true, reply, products: products || [] });
   } catch (e) {
     res.status(500).json({ error: e.message || 'internal error' });
   }

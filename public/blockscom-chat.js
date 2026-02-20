@@ -59,6 +59,30 @@
     border-bottom-left-radius: 4px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   }
+  .bc-slider {
+    align-self: flex-start;
+    display: flex; gap: 12px; overflow-x: auto;
+    max-width: 100%; padding: 4px; padding-bottom: 8px;
+    scroll-snap-type: x mandatory; scrollbar-width: thin;
+  }
+  .bc-slider::-webkit-scrollbar { height: 6px; }
+  .bc-slider::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+  .bc-card {
+    min-width: 160px; max-width: 160px; background: #fff;
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    scroll-snap-align: start; flex-shrink: 0;
+    font-size: 13px; text-align: left;
+    border: 1px solid #eee; transition: transform 0.2s;
+  }
+  .bc-card:hover { transform: translateY(-2px); border-color: #6e8efb; }
+  .bc-card img {
+    width: 100%; height: 120px; object-fit: cover;
+    background: #f0f0f0; border-bottom: 1px solid #eee;
+  }
+  .bc-card-body { padding: 12px; }
+  .bc-card-title { font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bc-card-price { color: #6e8efb; font-weight: 800; }
   .bc-input {
     display: flex; padding: 15px; background: #fff;
     border-top: 1px solid #eee; align-items: center; gap: 10px;
@@ -107,7 +131,7 @@
   const send = box.querySelector('#bc-send');
   const close = box.querySelector('#bc-close');
 
-  function push(role, text) {
+  function push(role, text, products = []) {
     const row = document.createElement('div');
     row.className = 'bc-row ' + (role === 'user' ? 'bc-user' : 'bc-bot');
     if (role === 'bot') {
@@ -121,6 +145,30 @@
       row.textContent = text;
     }
     msgs.appendChild(row);
+
+    // Render Product Slider if Products array exists
+    if (role === 'bot' && products && products.length > 0) {
+      const slider = document.createElement('div');
+      slider.className = 'bc-slider';
+      products.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'bc-card';
+        // Use placeholder or actual base64 local crop
+        const imgSrc = p.image_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" style="background:%23f4f4f4"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%23ccc">No Image</text></svg>';
+
+        card.innerHTML = `
+          <img src="${imgSrc}" alt="Product">
+          <div class="bc-card-body">
+            <div class="bc-card-title">${p.name}</div>
+            <div class="bc-card-price">$${parseFloat(p.price).toFixed(2)}</div>
+          </div>
+        `;
+
+        slider.appendChild(card);
+      });
+      msgs.appendChild(slider);
+    }
+
     msgs.scrollTop = msgs.scrollHeight;
   }
 
@@ -136,7 +184,7 @@
         body: JSON.stringify({ key, message: text })
       });
       const j = await r.json();
-      push('bot', j.reply || j.error || 'No response');
+      push('bot', j.reply || j.error || 'No response', j.products || []);
     } catch (e) {
       push('bot', 'Connection error');
     }
