@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLOCKSCOM | Premium AI SAAS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #09090b;
+      --surface: #121216;
+      --surface-elevated: #1c1c21;
+      --border: #27272a;
+      --primary: #ffffff;
+      --accent: #3f3f46;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+      background: var(--bg); 
+      color: var(--text); 
+      min-height: 100vh; 
+      display: flex;
+    }
+    
+    /* Layout */
+    .sidebar { 
+      width: 280px; 
+      border-right: 1px solid var(--border); 
+      padding: 32px 24px; 
+      display: flex; 
+      flex-direction: column;
+      position: fixed;
+      height: 100vh;
+      background: var(--bg);
+    }
+    .main { 
+      flex: 1; 
+      margin-left: 280px;
+      padding: 48px; 
+      max-width: 1300px;
+    }
+
+    /* Typography */
+    .logo { font-weight: 800; font-size: 1.25rem; margin-bottom: 48px; letter-spacing: -0.5px; }
+    .logo span { color: var(--text-dim); margin-left: 2px; }
+    h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.5px; }
+    h2 { font-size: 1.25rem; font-weight: 600; }
+    h3 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.5px; }
+
+    /* Navigation */
+    .nav-group { margin-bottom: 32px; }
+    .nav-label { font-size: 0.7rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding-left: 12px; }
+    .nav-item { 
+      padding: 12px 16px; 
+      border-radius: 10px; 
+      color: var(--text-muted); 
+      cursor: pointer; 
+      transition: 0.2s; 
+      font-size: 0.9rem; 
+      margin-bottom: 4px; 
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .nav-item:hover { background: var(--surface); color: var(--text); }
+    .nav-item.active { background: var(--surface-elevated); color: var(--primary); font-weight: 600; }
+    
+    .user-card { 
+      margin-top: auto; 
+      padding: 20px; 
+      background: var(--surface); 
+      border: 1px solid var(--border);
+      border-radius: 16px; 
+    }
+    .user-email { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-tier { font-size: 0.7rem; font-weight: 700; color: var(--text-dim); background: var(--bg); display: inline-block; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+    
+    /* Components */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 28px; margin-bottom: 24px; transition: 0.2s; }
+    .card:hover { border-color: var(--accent); }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; }
+    
+    .btn { 
+      padding: 10px 20px; 
+      border-radius: 10px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      border: none; 
+      font-size: 0.85rem; 
+      transition: 0.2s; 
+      display: inline-flex; 
+      align-items: center; 
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-primary { background: var(--primary); color: var(--bg); }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-secondary { background: var(--surface-elevated); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--accent); }
+    .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: white; }
+    
+    .input { 
+      width: 100%; 
+      padding: 14px; 
+      background: var(--bg); 
+      border: 1px solid var(--border); 
+      border-radius: 12px; 
+      color: var(--text); 
+      margin-top: 8px; 
+      margin-bottom: 20px; 
+      font-size: 0.9rem;
+      transition: 0.2s;
+    }
+    .input:focus { outline: none; border-color: var(--text-dim); }
+    textarea.input { min-height: 240px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+
+    .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+    .badge-premium { background: linear-gradient(135deg, #f59e0b, #ea580c); color: white; }
+    .badge-free { background: var(--accent); color: var(--text-muted); }
+    
+    /* Modals */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); padding: 20px; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--surface); width: 100%; max-width: 650px; padding: 40px; border-radius: 24px; border: 1px solid var(--border); max-height: 90vh; overflow-y: auto; }
+    
+    .kb-selection-container { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); overflow: hidden; }
+    .kb-search-bar { width: 100%; padding: 12px 16px; background: var(--surface); border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 0.85rem; outline: none; }
+    .kb-selection-list { max-height: 200px; overflow-y: auto; padding: 8px; }
+    .kb-checkbox { 
+      padding: 8px 12px; border-radius: 8px; display: flex; 
+      align-items: center; gap: 10px; cursor: pointer;
+      font-size: 0.85rem; transition: 0.2s;
+    }
+    .kb-checkbox:hover { background: var(--surface-elevated); }
+    .kb-checkbox input { accent-color: var(--primary); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 0.7rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; padding: 16px; border-bottom: 1px solid var(--border); }
+    td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+
+    .empty-state { text-align: center; padding: 64px 24px; color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo">BLOCKSCOM<span>●</span></div>
+    
+    <div class="nav-group">
+      <div class="nav-label">Main</div>
+      <div class="nav-item active" id="nav-pages" onclick="showView('pages')">Dashboard</div>
+      <div class="nav-item" id="nav-kb" onclick="showView('kb')">Knowledge Base</div>
+      <div class="nav-item" id="nav-products" onclick="showView('products')">Inventory System</div>
+      <div class="nav-item" id="nav-logs" onclick="showView('logs')">Live Activity</div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Settings</div>
+      <div class="nav-item" id="nav-security" onclick="showView('security')">Account Security</div>
+      <div id="admin-nav" class="nav-item" style="display:none" onclick="showView('admin')">Admin Controls</div>
+    </div>
+    
+    <div class="user-card">
+      <div id="u-tier" class="user-tier">TIER: FREE</div>
+      <div id="u-email" class="user-email">...</div>
+      <div id="u-credits" style="font-size:0.75rem; color:var(--text-muted); font-weight:500">Credits: 0</div>
+      <button onclick="logout()" class="btn btn-secondary" style="width:100%; margin-top:20px; font-size:0.75rem">Sign Out</button>
+    </div>
+  </div>
+
+  <main class="main">
+    <!-- View: Pages -->
+    <div id="view-pages" class="view-section">
+      <div class="header">
+        <div><h1>My Automations</h1><p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Manage your Facebook Page webhooks.</p></div>
+        <button class="btn btn-primary" onclick="openPageModal()">+ Create Webhook</button>
+      </div>
+      <div id="pages-list" class="grid"></div>
+    </div>
+
+    <!-- View: KB -->
+    <div id="view-kb" class="view-section" style="display:none">
+      <div class="header">
+        <div><h1>Knowledge Base</h1><p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Add skills and context for your AI models.</p></div>
+        <div style="display:flex; gap:12px">
+          <button class="btn btn-secondary" onclick="scanFiles()">⟳ Import from Files</button>
+          <button class="btn btn-primary" onclick="openKbModal()">+ Add New Skill</button>
+        </div>
+      </div>
+      <div id="kb-list" class="grid"></div>
+    </div>
+
+    <!-- View: Products -->
+    <div id="view-products" class="view-section" style="display:none">
+      <div class="header">
+        <div>
+          <h1>Inventory System</h1>
+          <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Manage your inventory, auto-conversion currency, and bot-selling status.</p>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center">
+          <div style="text-align:right">
+            <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px">Display Currency</div>
+            <select id="currency-selector" class="input" style="margin:0; width:100px; padding:8px" onchange="updateCurrency()">
+               <option value="USD">USD ($)</option>
+               <option value="PHP">PHP (₱)</option>
+               <option value="EUR">EUR (€)</option>
+               <option value="GBP">GBP (£)</option>
+               <option value="JPY">JPY (¥)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="openProductModal()">+ Add New Product</button>
+        </div>
+      </div>
+      <div id="currency-rate-info" style="font-size:0.75rem; color:var(--text-dim); margin-bottom:12px; text-align:right">Loading rates...</div>
+      <div class="card" style="padding:0; overflow:hidden">
+        <table style="margin:0">
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>Category</th>
+              <th id="price-th">Price (USD)</th>
+              <th>Stock</th>
+              <th>Sell by Bot</th>
+              <th>Status</th>
+              <th style="text-align:right">Management</th>
+            </tr>
+          </thead>
+          <tbody id="products-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- View: Activity Logs -->
+    <div id="view-logs" class="view-section" style="display:none">
+      <div class="header"><h1>System Activity</h1></div>
+      <div class="card" style="padding:0; overflow:hidden">
+        <table style="margin:0"><thead><tr><th>Timestamp</th><th>Source Page</th><th>Type</th><th>Payload Detail</th></tr></thead><tbody id="logs-table"></tbody></table>
+      </div>
+    </div>
+
+    <!-- View: Admin -->
+    <div id="view-admin" class="view-section" style="display:none">
+      <div class="header"><h1>SaaS Administration</h1></div>
+      <div class="card" style="padding:0; overflow:hidden">
+        <table style="margin:0"><thead><tr><th>User Entity</th><th>System Role</th><th>Credits Balance</th><th>Management</th></tr></thead><tbody id="admin-users"></tbody></table>
+      </div>
+    </div>
+
+    <!-- View: Security -->
+    <div id="view-security" class="view-section" style="display:none">
+      <div class="header"><h1>Security Center</h1></div>
+      <div class="grid">
+        <div class="card">
+          <h2>Change Password</h2>
+          <form onsubmit="event.preventDefault(); updatePassword();" style="margin-top:24px">
+            <label>New Secret Password</label>
+            <input type="password" id="new-password" class="input" placeholder="Min. 8 characters" required>
+            <button type="submit" class="btn btn-primary">Update Account Password</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Transaction PIN</h2>
+          <p style="font-size:0.85rem; color:var(--text-dim); margin-top:8px">Secure your account actions with a 6-digit PIN.</p>
+          <form onsubmit="event.preventDefault(); updatePin();" style="margin-top:24px">
+            <label>Secure PIN</label>
+            <input type="password" id="new-pin" class="input" placeholder="XXXXXX" maxlength="6" required>
+            <button type="submit" class="btn btn-primary">Set Transaction PIN</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Page -->
+  <div class="modal-overlay" id="pageModal"><div class="modal">
+    <h2 id="pageModalTitle" style="margin-bottom:8px">Webhook Configuration</h2>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:32px">Configure how AI should handle this Facebook Page.</p>
+    <form onsubmit="event.preventDefault(); savePage();">
+      <input type="hidden" id="p-id-hidden">
+      
+      <label>Internal Name</label><input id="p-name" class="input" placeholder="e.g. Main Customer Support" required>
+      <label>Facebook Page ID (Numeric)</label><input id="p-id" class="input" placeholder="Find this in Page settings" required>
+      
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
+        <div><label>Verify Token</label><input id="p-vtok" class="input" placeholder="Your secret phrase" required></div>
+        <div>
+          <label>AI Intelligence Model</label>
+          <select id="p-model" class="input">
+            <option value="openai/gpt-5.2">GPT-5.2 (High Reason)</option>
+            <option value="anthropic/claude-3-sonnet">Claude 3.5 Sonnet</option>
+            <option value="google/gemini-pro">Gemini 2.5 Pro</option>
+          </select>
+        </div>
+      </div>
+      
+      <label>Page Access Token</label><input id="p-atok" class="input" type="password" placeholder="EAAb...">
+      <label>OpenRouter API Key (Optional per page)</label><input id="p-openrouter" class="input" type="password" placeholder="sk-or-...">
+      
+      <div style="margin-top:12px">
+        <h3>Active Knowledge Skills</h3>
+        <p style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">Select which skills this AI should use when replying.</p>
+        <div class="kb-selection-container">
+          <input type="text" class="kb-search-bar" placeholder="Search skills..." onkeyup="filterSkills(this.value)">
+          <div id="kb-selector-list" class="kb-selection-list"></div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px; margin-top:40px">
+        <button type="submit" class="btn btn-primary" style="flex:1">Deploy Configuration</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('pageModal')">Cancel</button>
+      </div>
+    </form>
+  </div></div>
+
+  <!-- Modal: KB -->
+  <div class="modal-overlay" id="kbModal"><div class="modal">
+    <h2 id="kbModalTitle" style="margin-bottom:8px">Skill Development</h2>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:32px">Add technical documentation or FAQ for the AI to ingest.</p>
+    <input type="hidden" id="kb-id-hidden">
+    <label>Skill Title</label><input id="kb-title" class="input" placeholder="e.g. Return Policy">
+    <label>Knowledge Content (.MD / Text)</label><textarea id="kb-content" class="input" placeholder="# Policy..."></textarea>
+    <div style="display:flex; gap:12px; margin-top:32px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveKb()">Save Skill Entry</button>
+      <button class="btn btn-secondary" onclick="closeModal('kbModal')">Cancel</button>
+    </div>
+  </div></div>
+
+  <!-- Modal: Product -->
+  <div class="modal-overlay" id="productModal"><div class="modal">
+    <h2 id="productModalTitle" style="margin-bottom:8px">Product Entry</h2>
+    <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:32px">Manage inventory details for your AI storefront.</p>
+    <form onsubmit="event.preventDefault(); saveProduct();">
+      <input type="hidden" id="prod-id-hidden">
+      <label>Product Name</label><input id="prod-name" class="input" placeholder="e.g. Premium Subscription" required>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
+        <div><label>Category</label><input id="prod-category" class="input" placeholder="SaaS, E-commerce, etc."></div>
+        <div><label>Price ($)</label><input type="number" step="0.01" id="prod-price" class="input" placeholder="0.00" required></div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
+        <div><label>Stock Quantity</label><input type="number" id="prod-stock" class="input" placeholder="100" required></div>
+        <div>
+          <label>Inventory Logic</label>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem">
+              <input type="checkbox" id="prod-sell-bot" style="width:18px; height:18px">
+              <span>Enable Bot Selling</span>
+            </label>
+            <select id="prod-active" class="input" style="margin:0; padding:10px">
+              <option value="true">Active & Visible</option>
+              <option value="false">Inactive/Draft</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <label>Product Description (AI Context)</label>
+      <textarea id="prod-description" class="input" style="min-height:120px" placeholder="Describe the product for the AI bot..."></textarea>
+      
+      <div style="display:flex; gap:12px; margin-top:32px">
+        <button type="submit" class="btn btn-primary" style="flex:1">Save Product Information</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button>
+      </div>
+    </form>
+  </div></div>
+
+  <script src="/config-client.js"></script>
+  <script>
+    const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    let currentSession = null;
+    let me = null;
+    let kbOptions = [];
+    let exchangeRates = { USD: 1 };
+    let displayCurrency = 'USD';
+
+    async function loadRates() {
+       try {
+          const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+          const data = await res.json();
+          exchangeRates = data.rates;
+          document.getElementById('currency-rate-info').innerText = `Live Rates: 1 USD = ${exchangeRates[displayCurrency] || 1} ${displayCurrency} (Updated: ${new Date().toLocaleTimeString()})`;
+       } catch (e) { console.error("Rate fetch failed:", e); }
+    }
+
+    function formatPrice(usdPrice) {
+       const rate = exchangeRates[displayCurrency] || 1;
+       const converted = parseFloat(usdPrice) * rate;
+       const symbols = { USD: '$', PHP: '₱', EUR: '€', GBP: '£', JPY: '¥' };
+       return `${symbols[displayCurrency] || displayCurrency} ${converted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    async function updateCurrency() {
+       displayCurrency = document.getElementById('currency-selector').value;
+       document.getElementById('price-th').innerText = `Price (${displayCurrency})`;
+       await loadRates();
+       await loadProducts();
+       await syncProductsToKb(); // Sync with new currency labels
+    }
+
+    async function init() {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) { window.location.href = '/login'; return; }
+      currentSession = data.session;
+      const res = await fetch('/api/me', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+      if (!res.ok) { logout(); return; }
+      me = await res.json();
+      
+      document.getElementById('u-email').innerText = me.email;
+      document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
+      document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
+      if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+      
+      await syncProductsToKb();
+      await loadKbOptions();
+      showView('pages');
+    }
+
+    async function loadKbOptions() {
+      const res = await fetch('/api/knowledge', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+      kbOptions = await res.json();
+    }
+
+    async function loadPages() {
+      const res = await fetch('/api/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+      const pages = await res.json();
+      const list = document.getElementById('pages-list');
+      if (pages.length === 0) {
+        list.innerHTML = '<div class="empty-state"><h3>No Automations Found</h3><p>Create your first Facebook Page webhook to get started.</p></div>';
+        return;
+      }
+      list.innerHTML = pages.map(p => `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px">
+            <div><div style="font-weight:700; font-size:1.1rem">${p.name}</div><div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">ID: ${p.fb_page_id}</div></div>
+            <div class="badge ${p.is_enabled ? 'badge-premium' : 'badge-free'}">${p.is_enabled ? 'Active' : 'Disabled'}</div>
+          </div>
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
+            <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
+            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">${window.location.origin}/webhook?page=${p.id}</code>
+          </div>
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
+            <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Website Plugin Snippet</div>
+            <code style="font-size:0.75rem; color:var(--text-muted); word-break:break-all">&lt;script src="${window.location.origin}/blockscom-chat.js" data-key="${p.widget_key || ''}" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
+          </div>
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px">
+            <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base||[]).length})</div>
+            <div style="font-size:0.8rem; color:var(--text-muted)">${(p.knowledge_base && p.knowledge_base.length) ? p.knowledge_base.slice(0,3).join(', ') + (p.knowledge_base.length>3 ? ' ...' : '') : 'No skills linked yet'}</div>
+          </div>
+          <div style="display:flex; gap:10px">
+            <button class="btn btn-secondary" style="flex:1" onclick="openPageModal('${p.id}')">Edit Config</button>
+            <button class="btn btn-danger" onclick="deletePage('${p.id}')">Del</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadKb() {
+      await loadKbOptions();
+      const list = document.getElementById('kb-list');
+      if (kbOptions.length === 0) {
+        list.innerHTML = '<div class="empty-state"><h3>Your Knowledge is Empty</h3><p>Add skills to help the AI understand your business.</p></div>';
+        return;
+      }
+      list.innerHTML = kbOptions.map(k => `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:16px">
+             <div style="font-weight:700; font-size:1rem">${k.title}</div>
+             <div class="badge badge-free">Skill Entry ${k.title === 'Product Catalog' ? '(Synced)' : ''}</div>
+          </div>
+          <div style="font-size:0.85rem; color:var(--text-dim); height:60px; overflow:hidden; mask-image:linear-gradient(to bottom, black 50%, transparent 100%)">${k.content}</div>
+          <div style="display:flex; gap:10px; margin-top:20px">
+            <button class="btn btn-secondary" style="flex:1" onclick="openKbModal('${k.id}')">Edit Skill</button>
+            <button class="btn btn-danger" onclick="deleteKb('${k.id}')">Del</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function scanFiles() {
+       const res = await fetch('/api/kb/scan-files', { method: 'POST', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+       const j = await res.json();
+       if(j.success) {
+          alert(`Imported ${j.count} new skills from markdown files.`);
+          await loadKb();
+       } else {
+          alert("Import failed: " + j.error);
+       }
+    }
+
+    async function loadLogs() {
+      const res = await fetch('/api/logs', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+      const logs = await res.json();
+      document.getElementById('logs-table').innerHTML = logs.map(l => `
+        <tr>
+          <td style="color:var(--text-dim); white-space:nowrap">${new Date(l.created_at).toLocaleTimeString()}</td>
+          <td style="font-weight:600">${l.fb_pages?.name || '---'}</td>
+          <td><span class="badge badge-free">${l.type}</span></td>
+          <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis"><code>${JSON.stringify(l.payload)}</code></td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="empty-state">No recent activity logged.</td></tr>';
+    }
+
+    async function loadAdminUsers() {
+      const res = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+      const users = await res.json();
+      document.getElementById('admin-users').innerHTML = users.map(u => `
+        <tr>
+          <td><div style="font-weight:600">${u.email}</div><div style="font-size:0.7rem; color:var(--text-dim)">${u.id}</div></td>
+          <td><span class="badge ${u.role==='ADMIN'?'badge-premium':'badge-free'}">${u.role}</span></td>
+          <td style="font-weight:700">${u.credits.toLocaleString()}</td>
+          <td><button class="btn btn-secondary" onclick="editUser('${u.id}', ${u.credits}, '${u.role}')">Manage</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function showView(view) {
+      document.querySelectorAll('.view-section').forEach(d => d.style.display = 'none');
+      document.getElementById('view-' + view).style.display = 'block';
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      const nav = document.getElementById('nav-' + (view==='admin'?'admin-nav':view));
+      if(nav) nav.classList.add('active');
+      if(view === 'admin') loadAdminUsers();
+      if(view === 'kb') loadKb();
+      if(view === 'logs') loadLogs();
+      if(view === 'pages') loadPages();
+      if(view === 'products') loadProducts();
+    }
+
+    async function loadProducts() {
+      // We load products from the special KB entry titled "Product Catalog"
+      const { data: kb } = await sb.from('knowledge_entries').select('*').eq('profile_id', me.id).eq('title', 'Product Catalog').single();
+      let products = [];
+      if(kb && kb.content) {
+        try {
+          // Look for JSON block at the bottom of the content
+          const jsonMatch = kb.content.match(/```json\n([\s\S]*?)\n```/);
+          if(jsonMatch) products = JSON.parse(jsonMatch[1]);
+        } catch(e) { console.error("Failed to parse product JSON", e); }
+      }
+
+      const tbody = document.getElementById('products-table-body');
+      if (products.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No products found. Inventory is empty.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = products.map((p, idx) => `
+        <tr>
+          <td><div style="font-weight:600">${p.name}</div><div style="font-size:0.7rem; color:var(--text-dim); max-width:200px; overflow:hidden; text-overflow:ellipsis">${p.description || ''}</div></td>
+          <td><span class="badge badge-free">${p.category || 'N/A'}</span></td>
+          <td style="font-weight:700">${formatPrice(p.price)}</td>
+          <td>${p.stock_quantity}</td>
+          <td><span class="badge ${p.is_sellable ? 'badge-premium' : 'badge-free'}">${p.is_sellable ? 'Selling' : 'Manual'}</span></td>
+          <td><span class="badge ${p.is_active ? 'badge-premium' : 'badge-free'}">${p.is_active ? 'Active' : 'Draft'}</span></td>
+          <td style="text-align:right">
+            <div style="display:flex; gap:8px; justify-content:flex-end">
+              <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.75rem" onclick="openProductModal('${idx}')">Edit</button>
+              <button class="btn btn-danger" style="padding:4px 12px; font-size:0.75rem" onclick="deleteProduct('${idx}')">Del</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function openProductModal(idx = null) {
+      document.getElementById('productModalTitle').innerText = idx !== null ? 'Edit Product' : 'New Product Entry';
+      document.getElementById('prod-id-hidden').value = idx !== null ? idx : '';
+      document.getElementById('prod-name').value = '';
+      document.getElementById('prod-category').value = '';
+      document.getElementById('prod-price').value = '';
+      document.getElementById('prod-stock').value = '';
+      document.getElementById('prod-active').value = 'true';
+      document.getElementById('prod-sell-bot').checked = true;
+      document.getElementById('prod-description').value = '';
+      
+      if(idx !== null) {
+        const { data: kb } = await sb.from('knowledge_entries').select('*').eq('profile_id', me.id).eq('title', 'Product Catalog').single();
+        if(kb) {
+           const products = JSON.parse(kb.content.match(/```json\n([\s\S]*?)\n```/)[1]);
+           const data = products[idx];
+           if(data) {
+              document.getElementById('prod-name').value = data.name;
+              document.getElementById('prod-category').value = data.category;
+              document.getElementById('prod-price').value = data.price;
+              document.getElementById('prod-stock').value = data.stock_quantity;
+              document.getElementById('prod-active').value = String(data.is_active);
+              document.getElementById('prod-sell-bot').checked = !!data.is_sellable;
+              document.getElementById('prod-description').value = data.description || '';
+           }
+        }
+      }
+      document.getElementById('productModal').style.display = 'flex';
+    }
+
+    async function saveProduct() {
+      const idx = document.getElementById('prod-id-hidden').value;
+      const newItem = {
+        name: document.getElementById('prod-name').value,
+        category: document.getElementById('prod-category').value,
+        price: parseFloat(document.getElementById('prod-price').value),
+        stock_quantity: parseInt(document.getElementById('prod-stock').value),
+        is_active: document.getElementById('prod-active').value === 'true',
+        is_sellable: document.getElementById('prod-sell-bot').checked,
+        description: document.getElementById('prod-description').value
+      };
+
+      const { data: kb } = await sb.from('knowledge_entries').select('*').eq('profile_id', me.id).eq('title', 'Product Catalog').single();
+      let products = [];
+      if(kb && kb.content) {
+        try { products = JSON.parse(kb.content.match(/```json\n([\s\S]*?)\n```/)[1]); } catch(e) {}
+      }
+
+      if (idx !== '') {
+        products[parseInt(idx)] = newItem;
+      } else {
+        products.push(newItem);
+      }
+
+      await updateInventoryKb(products);
+      closeModal('productModal');
+      await loadProducts();
+    }
+
+    async function deleteProduct(idx) {
+      if(!confirm('Delete this product?')) return;
+      const { data: kb } = await sb.from('knowledge_entries').select('*').eq('profile_id', me.id).eq('title', 'Product Catalog').single();
+      if(kb) {
+        let products = JSON.parse(kb.content.match(/```json\n([\s\S]*?)\n```/)[1]);
+        products.splice(parseInt(idx), 1);
+        await updateInventoryKb(products);
+        await loadProducts();
+      }
+    }
+
+    async function updateInventoryKb(products) {
+      const title = "Product Catalog";
+      let md = `# Store Catalog (Currency: ${displayCurrency})\n\n`;
+      products.filter(p => p.is_active && p.is_sellable).forEach(p => {
+        md += `### ${p.name}\n- **Price**: ${formatPrice(p.price)}\n- **Category**: ${p.category || 'General'}\n- **Stock**: ${p.stock_quantity > 0 ? 'Available ('+p.stock_quantity+')' : 'Sold Out'}\n- **Description**: ${p.description || 'No description available.'}\n\n`;
+      });
+      md += `\n*Note: All prices are auto-converted from USD based on latest exchange rates.*\n\n`;
+      md += `<!-- DATABASE_START -->\n\`\`\`json\n${JSON.stringify(products, null, 2)}\n\`\`\`\n<!-- DATABASE_END -->`;
+
+      const { data: existing } = await sb.from('knowledge_entries').select('id').eq('profile_id', me.id).eq('title', title).single();
+      
+      const body = { id: existing?.id, title, content: md };
+      await fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) });
+      console.log("Inventory KB Updated & Synced.");
+    }
+
+    async function openPageModal(id = null) {
+      document.getElementById('pageModalTitle').innerText = id ? 'Update Configuration' : 'New Webhook Setup';
+      document.getElementById('p-id-hidden').value = id || '';
+      document.getElementById('p-name').value = '';
+      document.getElementById('p-id').value = '';
+      document.getElementById('p-vtok').value = '';
+      document.getElementById('p-atok').value = '';
+      document.getElementById('p-openrouter').value = '';
+      
+      let selected = new Set();
+
+      if(id) {
+         const res = await fetch('/api/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+         const pages = await res.json();
+         const p = pages.find(p => p.id === id);
+         if(p) {
+           document.getElementById('p-name').value = p.name;
+           document.getElementById('p-id').value = p.fb_page_id;
+           document.getElementById('p-vtok').value = p.verify_token;
+           document.getElementById('p-model').value = p.ai_model || 'openai/gpt-5.2';
+
+           // Never prefill secret inputs with masked values; keep blank and show saved state in placeholder
+           const at = document.getElementById('p-atok');
+           const ork = document.getElementById('p-openrouter');
+           at.value = '';
+           ork.value = '';
+           at.placeholder = p.access_token ? 'Saved (encrypted) — paste new token to replace' : 'EAAb...';
+           ork.placeholder = p.openrouter_key ? 'Saved (encrypted) — paste new key to replace' : 'sk-or-...';
+
+           selected = new Set(p.knowledge_base || []);
+         }
+      }
+
+      renderKbSelectionList(kbOptions, selected);
+      document.getElementById('pageModal').style.display = 'flex';
+    }
+
+    function renderKbSelectionList(options, selectedSet) {
+      const list = document.getElementById('kb-selector-list');
+      list.innerHTML = options.map(k => `
+        <label class="kb-checkbox" data-title="${k.title.toLowerCase()}">
+          <input type="checkbox" value="${k.title}" ${selectedSet.has(k.title) ? 'checked' : ''}>
+          <span>${k.title}</span>
+        </label>
+      `).join('') || '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">No knowledge skills found. Create some in the Knowledge Base tab.</p>';
+    }
+
+    function filterSkills(query) {
+      const q = query.toLowerCase();
+      document.querySelectorAll('#kb-selector-list .kb-checkbox').forEach(el => {
+        const title = el.getAttribute('data-title');
+        el.style.display = title.includes(q) ? 'flex' : 'none';
+      });
+    }
+
+    async function savePage() {
+      const kbSelected = Array.from(document.querySelectorAll('#kb-selector-list input:checked')).map(i => i.value);
+      const body = { 
+        id: document.getElementById('p-id-hidden').value || undefined,
+        name: document.getElementById('p-name').value, 
+        fb_page_id: document.getElementById('p-id').value, 
+        verify_token: document.getElementById('p-vtok').value, 
+        access_token: document.getElementById('p-atok').value,
+        openrouter_key: document.getElementById('p-openrouter').value,
+        ai_model: document.getElementById('p-model').value,
+        knowledge_base: kbSelected
+      };
+      const res = await fetch('/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) });
+      if (res.ok) {
+        closeModal('pageModal');
+        loadPages();
+        alert('Page updated successfully.');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert('Error saving page: ' + (err.error || 'unknown error'));
+      }
+    }
+
+    function openKbModal(id = null) {
+      document.getElementById('kbModalTitle').innerText = id ? 'Refine Skill' : 'Create New Skill';
+      document.getElementById('kb-id-hidden').value = id || '';
+      document.getElementById('kb-title').value = '';
+      document.getElementById('kb-content').value = '';
+      if(id) {
+        const k = kbOptions.find(k => k.id === id);
+        if(k) {
+          document.getElementById('kb-title').value = k.title;
+          document.getElementById('kb-content').value = k.content;
+        }
+      }
+      document.getElementById('kbModal').style.display = 'flex';
+    }
+
+    async function saveKb() {
+      const body = { 
+        id: document.getElementById('kb-id-hidden').value || undefined,
+        title: document.getElementById('kb-title').value, 
+        content: document.getElementById('kb-content').value 
+      };
+      await fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) });
+      closeModal('kbModal'); loadKb();
+    }
+
+    async function updatePassword() {
+      const password = document.getElementById('new-password').value;
+      if (password.length < 8) { alert('Password must be at least 8 characters.'); return; }
+      const { error } = await sb.auth.updateUser({ password });
+      if (error) alert(error.message);
+      else { alert('Password updated!'); document.getElementById('new-password').value = ''; }
+    }
+
+    async function updatePin() {
+      const pin = document.getElementById('new-pin').value;
+      if (pin.length < 6) { alert('PIN must be 6 digits.'); return; }
+      const res = await fetch('/api/me/pin', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify({ pin }) });
+      if (res.ok) { alert('PIN updated!'); document.getElementById('new-pin').value = ''; }
+    }
+
+    async function editUser(id, credits, role) {
+      const newCredits = prompt('Set user credit balance:', credits);
+      const newRole = prompt('Set user role (FREE, PREMIUM, ENTERPRISE, ADMIN):', role);
+      if (newCredits === null || newRole === null) return;
+      await fetch('/api/admin/users/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify({ credits: parseInt(newCredits), role: newRole }) });
+      loadAdminUsers();
+    }
+
+    async function deletePage(id) { if(confirm('Delete automation?')) { await fetch('/api/pages/'+id, {method:'DELETE', headers:{'Authorization':`Bearer ${currentSession.access_token}`}}); loadPages(); } }
+    async function deleteKb(id) { if(confirm('Delete skill?')) { await fetch('/api/knowledge/'+id, {method:'DELETE', headers:{'Authorization':`Bearer ${currentSession.access_token}`}}); loadKb(); } }
+    function closeModal(m) { document.getElementById(m).style.display = 'none'; }
+    async function logout() { await sb.auth.signOut(); window.location.href = '/login'; }
+
+    init();
+  </script>
+</body>
+</html>

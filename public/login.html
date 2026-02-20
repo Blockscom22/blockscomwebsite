@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLOCKSCOM | Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #09090b;
+      --surface: #18181b;
+      --border: #27272a;
+      --primary: #ffffff;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 40px;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+    .logo { font-weight: 800; font-size: 1.5rem; text-align: center; margin-bottom: 32px; }
+    .logo span { color: #fff; opacity: 0.5; }
+    
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+    input { 
+      width: 100%; padding: 12px; background: var(--bg); 
+      border: 1px solid var(--border); border-radius: 8px; 
+      color: var(--text); font-size: 0.9rem;
+    }
+    .btn { 
+      width: 100%; padding: 12px; border-radius: 8px; 
+      font-weight: 700; cursor: pointer; border: none; 
+      margin-top: 10px; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: var(--bg); }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    
+    .switch { text-align: center; margin-top: 24px; font-size: 0.85rem; color: var(--text-muted); }
+    .switch a { color: var(--text); text-decoration: none; font-weight: 600; cursor: pointer; }
+    #error-msg { color: #ef4444; font-size: 0.8rem; text-align: center; margin-bottom: 16px; min-height: 1em; }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <div class="logo">BLOCKSCOM <span>●</span></div>
+    <div id="error-msg"></div>
+    
+    <form id="login-form" onsubmit="event.preventDefault(); handleAuth('signin')">
+      <div class="form-group"><label>Email</label><input type="email" id="email" placeholder="name@company.com" required></div>
+      <div class="form-group"><label>Password</label><input type="password" id="password" placeholder="••••••••" required></div>
+      <button type="submit" class="btn btn-primary">Sign In</button>
+      <div class="switch">New to Blockscom? <a onclick="toggleForm()">Create account</a></div>
+    </form>
+
+    <form id="signup-form" style="display:none" onsubmit="event.preventDefault(); handleAuth('signup')">
+      <div class="form-group"><label>Email</label><input type="email" id="s-email" placeholder="name@company.com" required></div>
+      <div class="form-group"><label>Password</label><input type="password" id="s-password" placeholder="••••••••" required></div>
+      <button type="submit" class="btn btn-primary">Create Account</button>
+      <div class="switch">Already have an account? <a onclick="toggleForm()">Sign in</a></div>
+    </form>
+  </div>
+
+  <script src="/config-client.js"></script>
+  <script>
+    const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+    function toggleForm() {
+      const isLogin = document.getElementById('login-form').style.display !== 'none';
+      document.getElementById('login-form').style.display = isLogin ? 'none' : 'block';
+      document.getElementById('signup-form').style.display = isLogin ? 'block' : 'none';
+      document.getElementById('error-msg').innerText = '';
+    }
+
+    async function handleAuth(mode) {
+      const email = document.getElementById(mode === 'signin' ? 'email' : 's-email').value;
+      const password = document.getElementById(mode === 'signin' ? 'password' : 's-password').value;
+      const errorEl = document.getElementById('error-msg');
+
+      try {
+        let result;
+        if (mode === 'signin') {
+          result = await sb.auth.signInWithPassword({ email, password });
+        } else {
+          result = await sb.auth.signUp({ email, password });
+        }
+
+        if (result.error) throw result.error;
+        
+        if (mode === 'signin') {
+          localStorage.setItem('sb-token', result.data.session.access_token);
+          window.location.href = '/dashboard';
+        } else {
+          alert('Check your email for confirmation!');
+        }
+      } catch (e) {
+        errorEl.innerText = e.message;
+      }
+    }
+  </script>
+</body>
+</html>
