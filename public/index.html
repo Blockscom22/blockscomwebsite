@@ -52,13 +52,33 @@
             z-index: 100;
             /* mask for smooth scroll overlay */
             background: linear-gradient(to bottom, rgba(9, 9, 11, 1) 0%, rgba(9, 9, 11, 0) 100%);
+            transition: background 0.3s;
+        }
+
+        .nav-logo {
+            z-index: 101;
+            position: relative;
+        }
+
+        .menu-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            cursor: pointer;
+            z-index: 101;
+            padding: 8px;
         }
 
         @media (max-width: 768px) {
             nav {
                 padding: 20px 24px;
-                flex-direction: column;
-                gap: 16px;
+            }
+
+            .menu-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
         }
 
@@ -78,6 +98,40 @@
             display: flex;
             gap: 32px;
             align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100vh;
+                background: var(--bg);
+                flex-direction: column;
+                justify-content: center;
+                gap: 40px;
+                transform: translateY(-100%);
+                transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s;
+                z-index: 100;
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            .nav-links.open {
+                transform: translateY(0);
+                opacity: 1;
+                pointer-events: all;
+            }
+
+            .nav-links a {
+                font-size: 1.5rem;
+            }
+
+            .nav-cta {
+                font-size: 1.25rem !important;
+                padding: 16px 40px;
+            }
         }
 
         .nav-links a {
@@ -475,13 +529,21 @@
 <body>
 
     <nav>
-        <a href="/" style="text-decoration:none; color:inherit;">
+        <a href="/" class="nav-logo" style="text-decoration:none; color:inherit;">
             <div class="logo">BLOCKSCOM<span>OS</span></div>
         </a>
+        <button class="menu-toggle" onclick="toggleMenu()">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
         <div class="nav-links">
-            <a href="#about">About</a>
-            <a href="#capabilities">Stack</a>
-            <a href="#process">Process</a>
+            <a href="#about" onclick="toggleMenu()">About</a>
+            <a href="#capabilities" onclick="toggleMenu()">Stack</a>
+            <a href="#process" onclick="toggleMenu()">Process</a>
             <a href="/login" class="nav-cta">Client Login</a>
         </div>
     </nav>
@@ -676,6 +738,17 @@
                 window.location.href = '/dashboard';
             }
         });
+
+        function toggleMenu() {
+            if (window.innerWidth <= 768) {
+                document.querySelector('.nav-links').classList.toggle('open');
+                if (document.querySelector('.nav-links').classList.contains('open')) {
+                    document.querySelector('nav').style.background = 'var(--bg)';
+                } else {
+                    document.querySelector('nav').style.background = 'linear-gradient(to bottom, rgba(9, 9, 11, 1) 0%, rgba(9, 9, 11, 0) 100%)';
+                }
+            }
+        }
 
         // Hero Text Animation
         const wrapChars = (selector, delayOffset = 0) => {
