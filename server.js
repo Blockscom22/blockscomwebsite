@@ -244,6 +244,87 @@ app.post('/api/kb/scan-files', requireAuth, async (req, res) => {
   }
 });
 
+// API: Import Products from File via AI
+app.post('/api/products/import', requireAuth, async (req, res) => {
+  try {
+    const { fileData } = req.body;
+    if (!fileData) return res.status(400).json({ error: 'No file data provided' });
+
+    // Use default OpenRouter key, fallback if not set
+    const resolvedApiKey = process.env.OPENROUTER_API_KEY;
+    if (!resolvedApiKey) {
+      return res.status(500).json({ error: 'System OpenRouter API key not configured for bulk import.' });
+    }
+
+    const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+      model: 'openai/gpt-4o', // Use a high-reasoning model for extraction
+      messages: [
+        {
+          role: 'system',
+          content: `You are an inventory parsing assistant. The user will provide raw text or CSV content.
+Your job is to extract the product data and return a STRICT JSON array of objects.
+
+REQUIRED JSON FORMAT:
+[
+  {
+    "name": "Product Name",
+    "category": "Category Name",
+    "price": 10.99,
+    "stock_quantity": 100,
+    "is_sellable": true,
+    "is_active": true
+  }
+]
+
+RULES:
+1. "price" must be a number (float/int).
+2. "stock_quantity" must be an integer.
+3. If "Sell by bot" or similar is mentioned as "SELLING" or true, set "is_sellable": true. If "DEACTIVATE" or false, set "is_sellable": false. Default to true if not specified.
+4. "is_active" should default to true.
+5. Do NOT wrap the JSON in markdown blocks (no \`\`\`json). Just return the raw JSON array.
+6. IF the input is completely unreadable, gibberish, or lacks clear product boundaries, DO NOT return an array. Instead, return exactly this JSON object:
+{"error": true, "message": "Invalid file format. Please use a default format like: Product Name, Category, Price, Stock, Sell by bot (SELLING OR DEACTIVATE)"}
+`
+        },
+        { role: 'user', content: String(fileData).substring(0, 10000) } // Prevent massive payloads
+      ]
+    }, {
+      headers: {
+        'Authorization': `Bearer ${resolvedApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://blockscom.ai',
+        'X-Title': 'Blockscom AI'
+      }
+    });
+
+    const reply = aiRes.data?.choices?.[0]?.message?.content?.trim() || '';
+
+    // Clean up potential markdown wrappers just in case the AI disobeys
+    let cleanJson = reply;
+    if (cleanJson.startsWith('\`\`\`json')) {
+      cleanJson = cleanJson.replace(/^\`\`\`json/i, '').replace(/\`\`\`$/, '').trim();
+    } else if (cleanJson.startsWith('\`\`\`')) {
+      cleanJson = cleanJson.replace(/^\`\`\`/i, '').replace(/\`\`\`$/, '').trim();
+    }
+
+    const parsed = JSON.parse(cleanJson);
+
+    if (parsed.error) {
+      return res.status(400).json(parsed); // Send the specific AI fallback error
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error("AI did not return a valid array.");
+    }
+
+    res.json({ success: true, products: parsed });
+
+  } catch (error) {
+    console.error('Import API Error:', error.message);
+    res.status(500).json({ error: 'Failed to process file. Ensure it loosely follows the required format.' });
+  }
+});
+
 // API: Admin - Get All Users
 app.get('/api/admin/users', requireAuth, async (req, res) => {
   if (req.user.profile.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
@@ -396,9 +477,24 @@ async function processMessage(event, fbPageId) {
     let kbQuery = supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id);
 
     // Filter by specific files if defined
+    let kbTitles = [];
+    let selectedProducts = [];
+    let selectedCategories = [];
+
     if (Array.isArray(page.knowledge_base) && page.knowledge_base.length > 0) {
-      console.log(`[DEBUG] Filtering KB by titles: ${page.knowledge_base.join(', ')}`);
-      kbQuery = kbQuery.in('title', page.knowledge_base);
+      page.knowledge_base.forEach(item => {
+        if (item.startsWith('prod:')) selectedProducts.push(item.substring(5));
+        else if (item.startsWith('cat:')) selectedCategories.push(item.substring(4));
+        else kbTitles.push(item);
+      });
+
+      if (kbTitles.length > 0) {
+        console.log(`[DEBUG] Filtering KB by titles: ${kbTitles.join(', ')}`);
+        kbQuery = kbQuery.in('title', kbTitles);
+      } else {
+        // If they ONLY selected products, we shouldn't fetch all KB, we should fetch none
+        kbQuery = kbQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Force empty
+      }
     }
 
     const { data: kb, error: kbError } = await kbQuery;
@@ -408,11 +504,23 @@ async function processMessage(event, fbPageId) {
 
     // 3b. Fetch Product Catalog
     console.log(`[DEBUG] Fetching product catalog for user ${page.profile_id}...`);
-    const { data: products, error: prodError } = await supabase
+    let prodQuery = supabase
       .from('products')
       .select('*')
       .eq('profile_id', page.profile_id)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .eq('is_sellable', true); // Only fetch sellable products for AI
+
+    if (selectedProducts.length > 0 || selectedCategories.length > 0) {
+      console.log(`[DEBUG] Filtering products: ${selectedProducts.length} specific, ${selectedCategories.length} categories`);
+      // We need an OR condition: name in selectedProducts OR category in selectedCategories
+      let orConditions = [];
+      if (selectedProducts.length > 0) orConditions.push(`name.in.("${selectedProducts.join('","')}")`);
+      if (selectedCategories.length > 0) orConditions.push(`category.in.("${selectedCategories.join('","')}")`);
+      prodQuery = prodQuery.or(orConditions.join(','));
+    }
+
+    const { data: products, error: prodError } = await prodQuery;
 
     let productCatalog = "";
     if (prodError) {
@@ -454,7 +562,7 @@ async function processMessage(event, fbPageId) {
             
             INSTRUCTIONS:
             - Answer based on the knowledge base and product catalog if relevant.
-            - If a user asks about products, recommend items from the catalog.
+            - If a user asks about products or pricing, ONLY recommend the specific items listed in the PRODUCT CATALOG above. Do not invent products.
             - Be polite and professional.
             - Keep answers concise for chat.
             `
