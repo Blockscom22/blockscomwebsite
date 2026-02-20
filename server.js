@@ -360,6 +360,64 @@ app.get('/api/logs', requireAuth, async (req, res) => {
   res.json(filtered);
 });
 
+// API: Analyze Logs
+app.post('/api/logs/analyze', requireAuth, async (req, res) => {
+  try {
+    const query = supabase.from('activity_logs').select('*, fb_pages(name, profile_id)').order('created_at', { ascending: false }).limit(50);
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Authorization filter
+    const relevantLogs = data.filter(l => req.user.profile.role === 'ADMIN' || l.fb_pages?.profile_id === req.user.id);
+    if (!relevantLogs || relevantLogs.length === 0) {
+      return res.status(400).json({ error: "No chat logs available to analyze." });
+    }
+
+    const logText = relevantLogs.map(log => {
+      let text = `Time: ${new Date(log.created_at).toLocaleString()}`;
+      if (log.payload) {
+        if (log.payload.sender) text += ` | Sender: ${log.payload.sender}`;
+        if (log.payload.in) text += `\nUser: ${log.payload.in}`;
+        if (log.payload.out) text += `\nAI: ${log.payload.out}`;
+      }
+      return text;
+    }).join('\n\n---\n\n');
+
+    const resolvedApiKey = process.env.OPENROUTER_API_KEY;
+    if (!resolvedApiKey) return res.status(500).json({ error: 'System OpenRouter API key not configured for analysis.' });
+
+    const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+      model: 'openai/gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert chatlog analyst. Review the provided customer interaction logs and generate a detailed report in Markdown format.
+Include:
+1. An overall summary of conversation topics.
+2. Customer sentiment analysis.
+3. Common questions or issues raised.
+4. An assessment of bot performance (quality of answers).
+Please format nicely with headers and bullet points.`
+        },
+        { role: 'user', content: logText.substring(0, 50000) }
+      ]
+    }, {
+      headers: {
+        'Authorization': `Bearer ${resolvedApiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://blockscom.ai',
+        'X-Title': 'Blockscom AI'
+      }
+    });
+
+    const report = aiRes.data?.choices?.[0]?.message?.content || 'Unable to generate analysis at this time.';
+    res.json({ success: true, report });
+  } catch (e) {
+    console.error('Analyze Logs Error:', e.message);
+    res.status(500).json({ error: 'Failed to analyze logs.' });
+  }
+});
+
 // ==================== WEBSITE WIDGET API (Shopify/HTML Plugin) ====================
 
 app.get('/api/widget/config', async (req, res) => {
@@ -621,7 +679,7 @@ async function processMessage(event, fbPageId) {
     await supabase.from('activity_logs').insert([{
       fb_page_id: page.id,
       type: 'AUTO_REPLY',
-      payload: { in: messageText, out: replyText }
+      payload: { in: messageText, out: replyText, sender: senderId }
     }]);
 
     if (userProfile && userProfile.role !== 'ADMIN') {

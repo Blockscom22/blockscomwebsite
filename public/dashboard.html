@@ -8,6 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     :root {
       --bg: #09090b;
@@ -582,8 +584,12 @@
 
     <!-- View: Activity Logs -->
     <div id="view-logs" class="view-section" style="display:none">
-      <div class="header">
+      <div class="header" style="display:flex; justify-content:space-between; align-items:center;">
         <h1>System Activity</h1>
+        <div style="display:flex; gap:12px;">
+          <button class="btn btn-secondary" onclick="exportLogsCSV()">⭳ Export Live Data (CSV)</button>
+          <button class="btn btn-primary" onclick="analyzeLogs()">✨ ANALYZE CHATLOGS (PDF)</button>
+        </div>
       </div>
       <div class="card" style="padding:0; overflow:hidden">
         <div class="table-responsive">
@@ -1014,9 +1020,108 @@
           <td style="color:var(--text-dim); white-space:nowrap">${new Date(l.created_at).toLocaleTimeString()}</td>
           <td style="font-weight:600">${l.fb_pages?.name || '---'}</td>
           <td><span class="badge badge-free">${l.type}</span></td>
-          <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis"><code>${JSON.stringify(l.payload)}</code></td>
+          <td style="max-width:400px; font-size:0.85rem; line-height:1.4;">
+            ${l.payload ? `
+              ${l.payload.sender ? `<div style="font-size:0.7rem; color:var(--primary); font-family:monospace; margin-bottom:4px;">Sender ID: ${l.payload.sender}</div>` : ''}
+              ${l.payload.in ? `<div style="margin-bottom:4px;"><strong>User:</strong> <span style="color:var(--text-dim);">${l.payload.in}</span></div>` : ''}
+              ${l.payload.out ? `<div><strong>AI:</strong> <span style="color:var(--text);">${l.payload.out}</span></div>` : ''}
+            ` : 'No payload data'}
+          </td>
         </tr>
       `).join('') || '<tr><td colspan="4" class="empty-state">No recent activity logged.</td></tr>';
+    }
+
+    async function exportLogsCSV() {
+      try {
+        const res = await fetch('/api/logs', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        const logs = await res.json();
+
+        if (!logs || logs.length === 0) {
+          alert('No live data to export.');
+          return;
+        }
+
+        const headers = ['Timestamp', 'Page Name', 'Type', 'Sender ID', 'User Message', 'AI Reply'];
+        const rows = logs.map(l => {
+          return [
+            `"${new Date(l.created_at).toLocaleString()}"`,
+            `"${(l.fb_pages?.name || '').replace(/"/g, '""')}"`,
+            `"${l.type}"`,
+            `"${l.payload?.sender || ''}"`,
+            `"${(l.payload?.in || '').replace(/"/g, '""')}"`,
+            `"${(l.payload?.out || '').replace(/"/g, '""')}"`
+          ].join(',');
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + '\\n' + rows.join('\\n');
+        const encodedUri = encodeURI(csvContent);
+        const a = document.createElement('a');
+        a.setAttribute('href', encodedUri);
+        a.setAttribute('download', 'live_activity_logs.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        alert('Failed to construct export file: ' + err.message);
+      }
+    }
+
+    async function analyzeLogs() {
+      const btn = document.querySelector('button[onclick="analyzeLogs()"]');
+      const originalText = btn.innerText;
+      btn.innerHTML = '<span style="animation: pulse 1.5s infinite">✨ Analyzing... Please wait</span>';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/logs/analyze', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+        });
+        const result = await res.json();
+
+        if (!res.ok || result.error) {
+          alert('Analysis Failed: ' + (result.error || 'Unknown error'));
+          return;
+        }
+
+        // Convert the markdown report to HTML
+        const htmlContent = marked.parse(result.report);
+
+        // Create a hidden container for the PDF generation
+        const container = document.createElement('div');
+        container.innerHTML = `
+          <div style="font-family: 'Plus Jakarta Sans', sans-serif; color: #000; padding: 40px; line-height: 1.6;">
+            <h1 style="color: #000; border-bottom: 2px solid #ccc; padding-bottom: 10px;">Chatlogs AI Analysis Report</h1>
+            <div style="margin-top: 20px;">
+              ${htmlContent}
+            </div>
+            <div style="margin-top: 40px; font-size: 0.8rem; color: #666; text-align: center;">
+              Generated on ${new Date().toLocaleString()} by BLOCKSCOM AI
+            </div>
+          </div>
+        `;
+        document.body.appendChild(container);
+
+        // Define PDF options
+        const opt = {
+          margin: 0,
+          filename: 'Blockscom_AI_Chatlog_Analysis.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        // Generate and save the PDF
+        await html2pdf().set(opt).from(container).save();
+
+        // Cleanup
+        document.body.removeChild(container);
+      } catch (e) {
+        alert('An error occurred during analysis: ' + e.message);
+      } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      }
     }
 
     async function loadAdminUsers() {
