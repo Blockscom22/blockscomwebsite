@@ -652,6 +652,12 @@
     <script>
         // Check for Auth Callback (OAuth login)
         const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+        // Manual hash check for instant redirect (fallback)
+        if (window.location.hash && window.location.hash.includes('access_token')) {
+            window.location.href = '/dashboard' + window.location.hash;
+        }
+
         sb.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session) {
                 localStorage.setItem('sb-token', session.access_token);
