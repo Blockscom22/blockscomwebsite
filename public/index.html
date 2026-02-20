@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blockscom | Build Intelligent Systems</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Oswald:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Oswald:wght@700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg: #09090b;
@@ -35,18 +37,23 @@
         /* Nav */
         nav {
             position: fixed;
-            top: 0; width: 100%;
+            top: 0;
+            width: 100%;
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 24px 48px;
             z-index: 100;
             /* mask for smooth scroll overlay */
-            background: linear-gradient(to bottom, rgba(9,9,11,1) 0%, rgba(9,9,11,0) 100%);
+            background: linear-gradient(to bottom, rgba(9, 9, 11, 1) 0%, rgba(9, 9, 11, 0) 100%);
         }
-        
+
         @media (max-width: 768px) {
-            nav { padding: 20px 24px; flex-direction: column; gap: 16px; }
+            nav {
+                padding: 20px 24px;
+                flex-direction: column;
+                gap: 16px;
+            }
         }
 
         .logo {
@@ -56,13 +63,17 @@
             letter-spacing: -0.5px;
             text-transform: uppercase;
         }
-        .logo span { color: var(--text-dim); }
+
+        .logo span {
+            color: var(--text-dim);
+        }
 
         .nav-links {
             display: flex;
             gap: 32px;
             align-items: center;
         }
+
         .nav-links a {
             color: var(--text-main);
             text-decoration: none;
@@ -72,7 +83,11 @@
             letter-spacing: 1px;
             transition: color 0.3s;
         }
-        .nav-links a:hover { color: var(--text-dim); }
+
+        .nav-links a:hover {
+            color: var(--text-dim);
+        }
+
         .nav-cta {
             padding: 8px 24px;
             border: 1px solid var(--border);
@@ -80,6 +95,7 @@
             transition: all 0.3s;
             cursor: pointer;
         }
+
         .nav-cta:hover {
             background: var(--text-main);
             color: var(--bg);
@@ -87,8 +103,12 @@
         }
 
         /* Typography */
-        h1, h2, h3 { font-family: 'Inter', sans-serif; }
-        
+        h1,
+        h2,
+        h3 {
+            font-family: 'Inter', sans-serif;
+        }
+
         .huge-text {
             font-family: 'Oswald', sans-serif;
             font-size: clamp(60px, 15vw, 240px);
@@ -101,7 +121,7 @@
             padding: 0;
             text-align: left;
         }
-        
+
         .huge-text.outline {
             color: var(--bg);
             -webkit-text-stroke: 2px #3f3f46;
@@ -114,7 +134,12 @@
             margin: 0 auto;
             padding: 0 48px;
         }
-        @media (max-width: 768px) { .container { padding: 0 24px; } }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 24px;
+            }
+        }
 
         section {
             padding: 120px 0;
@@ -123,7 +148,7 @@
             flex-direction: column;
             justify-content: center;
         }
-        
+
         /* Hero Section */
         .hero {
             position: relative;
@@ -137,10 +162,12 @@
 
         .hero-bg-glow {
             position: absolute;
-            top: 50%; left: 50%;
+            top: 50%;
+            left: 50%;
             transform: translate(-50%, -50%);
-            width: 800px; height: 800px;
-            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(9,9,11,0) 70%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.03) 0%, rgba(9, 9, 11, 0) 70%);
             z-index: -1;
             pointer-events: none;
         }
@@ -151,8 +178,13 @@
             grid-template-columns: 1fr 1fr;
             gap: 40px;
         }
-        @media (max-width: 900px) { .hero-bottom-grid { grid-template-columns: 1fr; } }
-        
+
+        @media (max-width: 900px) {
+            .hero-bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .hero-desc {
             font-size: 1.1rem;
             color: var(--text-dim);
@@ -165,7 +197,13 @@
             gap: 16px;
             align-items: center;
         }
-        @media (max-width: 500px) { .cta-container { flex-direction: column; align-items: stretch;} }
+
+        @media (max-width: 500px) {
+            .cta-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
 
         .btn {
             display: inline-flex;
@@ -179,20 +217,24 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
         }
+
         .btn-primary {
             background: var(--text-main);
             color: var(--bg);
             border: 1px solid var(--text-main);
         }
+
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 40px rgba(255, 255, 255, 0.1);
         }
+
         .btn-secondary {
             background: transparent;
             color: var(--text-main);
             border: 1px solid var(--border);
         }
+
         .btn-secondary:hover {
             background: var(--surface);
             border-color: var(--text-dim);
@@ -210,6 +252,7 @@
             align-items: center;
             gap: 16px;
         }
+
         .section-label::after {
             content: '';
             flex: 1;
@@ -217,7 +260,7 @@
             background: var(--border);
             max-width: 100px;
         }
-        
+
         .section-title {
             font-size: clamp(32px, 5vw, 64px);
             font-weight: 600;
@@ -234,7 +277,11 @@
             max-width: 600px;
             margin-bottom: 24px;
         }
-        .text-body.highlight { color: var(--text-main); font-weight: 500;}
+
+        .text-body.highlight {
+            color: var(--text-main);
+            font-weight: 500;
+        }
 
         /* Grid Cards */
         .bento-grid {
@@ -253,26 +300,38 @@
             position: relative;
             overflow: hidden;
         }
+
         .card::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at top right, rgba(255,255,255,0.05) 0%, transparent 70%);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
             opacity: 0;
             transition: opacity 0.4s;
         }
+
         .card:hover {
             transform: translateY(-5px);
             border-color: #3f3f46;
         }
-        .card:hover::before { opacity: 1; }
-        
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
         .card h3 {
             font-size: 1.5rem;
             font-weight: 600;
             margin-bottom: 16px;
         }
-        .card p { color: var(--text-dim); font-size: 1rem; }
+
+        .card p {
+            color: var(--text-dim);
+            font-size: 1rem;
+        }
 
         /* Process Steps */
         .process-list {
@@ -282,6 +341,7 @@
             margin-top: 40px;
             border-top: 1px solid var(--border);
         }
+
         .process-item {
             display: grid;
             grid-template-columns: 100px 1fr 2fr;
@@ -290,16 +350,29 @@
             border-bottom: 1px solid var(--border);
             align-items: start;
         }
+
         @media (max-width: 768px) {
-            .process-item { grid-template-columns: 1fr; gap: 12px; padding: 32px 0; }
+            .process-item {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                padding: 32px 0;
+            }
         }
+
         .process-num {
             font-family: 'Oswald', sans-serif;
             font-size: 1.5rem;
             color: var(--text-dim);
         }
-        .process-item h3 { font-size: 1.5rem; }
-        .process-item p { color: var(--text-dim); font-size: 1.1rem; }
+
+        .process-item h3 {
+            font-size: 1.5rem;
+        }
+
+        .process-item p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
 
         /* Lists */
         .bullet-list {
@@ -309,6 +382,7 @@
             gap: 16px;
             margin-top: 40px;
         }
+
         .bullet-list li {
             font-size: 1.5rem;
             display: flex;
@@ -317,10 +391,15 @@
             color: var(--text-dim);
             transition: color 0.3s;
         }
-        .bullet-list li:hover { color: var(--text-main); }
+
+        .bullet-list li:hover {
+            color: var(--text-main);
+        }
+
         .bullet-list li::before {
             content: '';
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             background: var(--text-main);
             border-radius: 50%;
         }
@@ -340,12 +419,15 @@
             position: relative;
             overflow: hidden;
         }
+
         .footer-bg {
             position: absolute;
-            bottom: 0; left: 50%;
+            bottom: 0;
+            left: 50%;
             transform: translateX(-50%);
-            width: 100%; height: 500px;
-            background: radial-gradient(circle at bottom, rgba(255,255,255,0.05) 0%, transparent 60%);
+            width: 100%;
+            height: 500px;
+            background: radial-gradient(circle at bottom, rgba(255, 255, 255, 0.05) 0%, transparent 60%);
             z-index: -1;
             pointer-events: none;
         }
@@ -356,21 +438,28 @@
             transform: translateY(30px);
             transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
+
         .reveal.active {
             opacity: 1;
             transform: translateY(0);
         }
-        
+
         .char-reveal span {
             display: inline-block;
             opacity: 0;
             transform: translateY(50px);
             animation: textUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        @keyframes textUp { to { opacity: 1; transform: translateY(0); } }
 
+        @keyframes textUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 </head>
+
 <body>
 
     <nav>
@@ -395,7 +484,8 @@
 
         <div class="hero-bottom-grid reveal">
             <p class="hero-desc">
-                Blockscom designs and deploys AI-powered automation systems that replace manual workflows, connect your tools, and run your business processes 24/7.
+                Blockscom designs and deploys AI-powered automation systems that replace manual workflows, connect your
+                tools, and run your business processes 24/7.
             </p>
             <div class="cta-container">
                 <a href="#contact" class="btn btn-primary">Book a Strategy Call</a>
@@ -409,9 +499,13 @@
         <div class="section-label reveal">What We Actually Do</div>
         <h2 class="section-title reveal">We Engineer Business Intelligence Infrastructure</h2>
         <div class="reveal">
-            <p class="text-body highlight">Most companies use AI as a tool.<br>We use AI as the operating layer of your business.</p>
-            <p class="text-body">Blockscom builds fully integrated automation ecosystems — combining AI agents, APIs, databases, messaging platforms, and cloud infrastructure into one cohesive system that works autonomously.</p>
-            <p class="text-body">From lead generation to internal operations, from CRM automation to AI decision engines — we design systems that execute, not just assist.</p>
+            <p class="text-body highlight">Most companies use AI as a tool.<br>We use AI as the operating layer of your
+                business.</p>
+            <p class="text-body">Blockscom builds fully integrated automation ecosystems — combining AI agents, APIs,
+                databases, messaging platforms, and cloud infrastructure into one cohesive system that works
+                autonomously.</p>
+            <p class="text-body">From lead generation to internal operations, from CRM automation to AI decision engines
+                — we design systems that execute, not just assist.</p>
         </div>
     </section>
 
@@ -419,11 +513,12 @@
     <section id="capabilities" class="container">
         <div class="section-label reveal">Our Core Capabilities</div>
         <h2 class="section-title reveal">Our Automation Stack</h2>
-        
+
         <div class="bento-grid">
             <div class="card reveal" style="transition-delay: 0.1s;">
                 <h3>AI Agent Architecture</h3>
-                <p>Custom AI agents that can reason, retrieve memory, execute tools, and automate multi-step workflows.</p>
+                <p>Custom AI agents that can reason, retrieve memory, execute tools, and automate multi-step workflows.
+                </p>
             </div>
             <div class="card reveal" style="transition-delay: 0.2s;">
                 <h3>Workflow Automation</h3>
@@ -431,11 +526,13 @@
             </div>
             <div class="card reveal" style="transition-delay: 0.3s;">
                 <h3>System Integration</h3>
-                <p>We connect your ecosystem — Telegram, WhatsApp, ConvertKit, Kajabi, Google Workspace, databases, APIs — into a single automated pipeline.</p>
+                <p>We connect your ecosystem — Telegram, WhatsApp, ConvertKit, Kajabi, Google Workspace, databases, APIs
+                    — into a single automated pipeline.</p>
             </div>
             <div class="card reveal" style="transition-delay: 0.4s;">
                 <h3>Deployment & Infrastructure</h3>
-                <p>VPS deployment, Docker environments, reverse proxies, security configuration, monitoring, and scaling.</p>
+                <p>VPS deployment, Docker environments, reverse proxies, security configuration, monitoring, and
+                    scaling.</p>
             </div>
             <div class="card reveal" style="grid-column: 1 / -1; transition-delay: 0.5s;">
                 <h3>24/7 Autonomous Operations</h3>
@@ -483,7 +580,8 @@
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 80px;">
             <div>
                 <div class="section-label reveal">Who We Help</div>
-                <h2 class="section-title reveal" style="font-size:clamp(24px, 3vw, 40px)">Built for Businesses That Think Long-Term</h2>
+                <h2 class="section-title reveal" style="font-size:clamp(24px, 3vw, 40px)">Built for Businesses That
+                    Think Long-Term</h2>
                 <ul class="bullet-list reveal">
                     <li>AI-first startups</li>
                     <li>Agencies scaling operations</li>
@@ -494,7 +592,8 @@
             </div>
             <div>
                 <div class="section-label reveal">Why Blockscom</div>
-                <h2 class="section-title reveal" style="font-size:clamp(24px, 3vw, 40px)">We Don’t Build Bots.<br>We Build Operating Systems.</h2>
+                <h2 class="section-title reveal" style="font-size:clamp(24px, 3vw, 40px)">We Don’t Build Bots.<br>We
+                    Build Operating Systems.</h2>
                 <div class="reveal">
                     <p class="text-body">Most automation fails because it’s stitched together.</p>
                     <p class="text-body">Blockscom designs from the architecture layer first — ensuring:</p>
@@ -515,16 +614,38 @@
     <section id="contact" class="footer-cta">
         <div class="footer-bg"></div>
         <div class="container" style="max-width: 800px; position:relative; z-index:2;">
-            <h2 class="huge-text outline reveal" style="font-size: clamp(40px, 8vw, 120px); text-align: center; line-height: 1.1; margin-bottom:24px;">READY TO AUTOMATE<br>THE RIGHT WAY?</h2>
+            <h2 class="huge-text outline reveal"
+                style="font-size: clamp(40px, 8vw, 120px); text-align: center; line-height: 1.1; margin-bottom:24px;">
+                READY TO AUTOMATE<br>THE RIGHT WAY?</h2>
             <p class="text-body reveal" style="margin: 0 auto 40px auto; text-align: center; color: var(--text-main);">
                 Stop hiring more people to solve process problems.<br>Install intelligent systems instead.
             </p>
             <div class="cta-container reveal" style="justify-content: center;">
-                <a href="#contact" class="btn btn-primary" style="padding: 20px 40px; font-size:1.1rem;">Schedule a Consultation</a>
-                <a href="#contact" class="btn btn-secondary" style="padding: 20px 40px; font-size:1.1rem;">Request Custom Blueprint</a>
+                <a href="#contact" class="btn btn-primary" style="padding: 20px 40px; font-size:1.1rem;">Schedule a
+                    Consultation</a>
+                <a href="#contact" class="btn btn-secondary" style="padding: 20px 40px; font-size:1.1rem;">Request
+                    Custom Blueprint</a>
             </div>
         </div>
     </section>
+
+    <!-- FOOTER -->
+    <footer
+        style="padding: 40px 24px; border-top: 1px solid var(--border); text-align: center; color: var(--text-dim); font-size: 0.9rem;">
+        <div class="container"
+            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div style="text-align: left;">
+                <div class="logo" style="font-size: 1.2rem; margin-bottom: 8px;">BLOCKSCOM<span>OS</span></div>
+                <div>&copy; 2026 Blockscom. All rights reserved.</div>
+            </div>
+            <div style="display: flex; gap: 24px;">
+                <a href="/privacy.html"
+                    style="color: var(--text-dim); text-decoration: none; transition: color 0.2s;">Privacy Policy</a>
+                <a href="/tos.html" style="color: var(--text-dim); text-decoration: none; transition: color 0.2s;">Terms
+                    of Service</a>
+            </div>
+        </div>
+    </footer>
 
     <script>
         // Hero Text Animation
@@ -553,8 +674,9 @@
                 }
             });
         }, revealConfig);
-        
+
         document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
     </script>
 </body>
+
 </html>
