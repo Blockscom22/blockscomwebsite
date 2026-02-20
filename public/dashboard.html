@@ -549,6 +549,7 @@
               <option value="JPY">JPY (¥)</option>
             </select>
           </div>
+          <button class="btn btn-secondary" onclick="exportProductsCSV()">⭳ Export (CSV)</button>
           <button class="btn btn-secondary" onclick="document.getElementById('inventory-file').click()">⟳ Import
             Files</button>
           <input type="file" id="inventory-file" style="display:none" accept=".txt,.csv"
@@ -563,6 +564,7 @@
           <table style="margin:0">
             <thead>
               <tr>
+                <th style="width: 50px;">Image</th>
                 <th>Product Name</th>
                 <th>Category</th>
                 <th id="price-th">Price (USD)</th>
@@ -759,6 +761,8 @@
             </div>
           </div>
         </div>
+        <label>Image URL (Optional)</label><input id="prod-image-url" class="input"
+          placeholder="https://example.com/image.jpg">
         <label>Product Description (AI Context)</label>
         <textarea id="prod-description" class="input" style="min-height:120px"
           placeholder="Describe the product for the AI bot..."></textarea>
@@ -778,7 +782,7 @@
     let me = null;
     let kbOptions = [];
     let exchangeRates = { USD: 1, PHP: 1 };
-    let displayCurrency = 'PHP';
+    let displayCurrency = 'PHP'; // Target Default Fixed
 
     async function loadRates() {
       try {
@@ -827,7 +831,8 @@
     function updateSnippetTheme(pageId, widgetKey, theme) {
       const codeEl = document.getElementById('snippet-code-' + pageId);
       if (codeEl) {
-        codeEl.innerText = `<script src="${window.location.origin}/blockscom-chat.js" data-key="${widgetKey}" data-theme="${theme}" data-api="${window.location.origin}"></scr` + `ipt>`;
+        // Appending ?v=Date.now() ensures that users get the latest script without browser caching issues
+        codeEl.innerText = `<script src="${window.location.origin}/blockscom-chat.js?v=${Date.now()}" data-key="${widgetKey}" data-theme="${theme}" data-api="${window.location.origin}"></scr` + `ipt>`;
       }
     }
 
@@ -913,7 +918,7 @@
                 <option value="cyberpunk">Cyberpunk (Aesthetic)</option>
               </select>
             </div>
-            <code id="snippet-code-${p.id}" style="font-size:0.75rem; color:var(--text-muted); word-break:break-all">&lt;script src="${window.location.origin}/blockscom-chat.js" data-key="${p.widget_key || ''}" data-theme="default" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
+            <code id="snippet-code-${p.id}" style="font-size:0.75rem; color:var(--text-muted); word-break:break-all">&lt;script src="${window.location.origin}/blockscom-chat.js?v=${Date.now()}" data-key="${p.widget_key || ''}" data-theme="default" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base || []).filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).length})</div>
@@ -1037,6 +1042,11 @@
       // Based on SCHEMA.sql, there is no is_sellable. We'll add it logic or default to is_active if missing
       tbody.innerHTML = products.map(p => `
         <tr>
+          <td>
+            <div style="width: 40px; height: 40px; border-radius: 6px; background: var(--surface-elevated); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border);">
+              ${p.image_url ? `<img src="${p.image_url}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.outerHTML='<span style=\\'font-size: 10px; color: var(--text-dim)\\'>No Img</span>'">` : '<span style="font-size: 10px; color: var(--text-dim)">No Img</span>'}
+            </div>
+          </td>
           <td><div style="font-weight:600">${p.name}</div><div style="font-size:0.7rem; color:var(--text-dim); max-width:200px; overflow:hidden; text-overflow:ellipsis">${p.description || ''}</div></td>
           <td><span class="badge badge-free">${p.category || 'N/A'}</span></td>
           <td style="font-weight:700">${formatPrice(p.price)}</td>
@@ -1063,6 +1073,7 @@
       document.getElementById('prod-active').value = 'true';
       document.getElementById('prod-sell-bot').checked = true;
       document.getElementById('prod-description').value = '';
+      document.getElementById('prod-image-url').value = '';
 
       if (id !== null) {
         const { data, error } = await sb.from('products').select('*').eq('id', id).single();
@@ -1072,9 +1083,9 @@
           document.getElementById('prod-price').value = data.price;
           document.getElementById('prod-stock').value = data.stock_quantity;
           document.getElementById('prod-active').value = String(data.is_active);
-          // UI expects is_sellable. Map from schema
           document.getElementById('prod-sell-bot').checked = data.hasOwnProperty('is_sellable') ? !!data.is_sellable : true;
           document.getElementById('prod-description').value = data.description || '';
+          document.getElementById('prod-image-url').value = data.image_url || '';
         }
       }
       document.getElementById('productModal').style.display = 'flex';
@@ -1090,7 +1101,8 @@
         stock_quantity: parseInt(document.getElementById('prod-stock').value),
         is_active: document.getElementById('prod-active').value === 'true',
         is_sellable: document.getElementById('prod-sell-bot').checked,
-        description: document.getElementById('prod-description').value
+        description: document.getElementById('prod-description').value,
+        image_url: document.getElementById('prod-image-url').value
       };
 
       try {
@@ -1098,6 +1110,19 @@
           const { error } = await sb.from('products').update(newItem).eq('id', id);
           if (error) throw error;
         } else {
+          // Verify limits before inserting NEW product
+          const { count, error: countErr } = await sb.from('products').select('*', { count: 'exact', head: true }).eq('profile_id', me.id);
+          if (countErr) throw countErr;
+
+          if (me.role === 'FREE' && count >= 2) {
+            alert('FREE tier users are limited to 2 products. Please upgrade to add more.');
+            return;
+          }
+          if (me.role !== 'FREE' && me.role !== 'ADMIN' && count >= 100) {
+            alert('Your current tier is limited to 100 products. Please contact support to increase limits.');
+            return;
+          }
+
           const { error } = await sb.from('products').insert([newItem]);
           if (error) throw error;
         }
@@ -1177,6 +1202,44 @@
       };
 
       reader.readAsText(file);
+    }
+
+    async function exportProductsCSV() {
+      try {
+        const { data: products, error } = await sb.from('products').select('*').eq('profile_id', me.id).order('created_at', { ascending: false });
+        if (error) throw error;
+
+        if (!products || products.length === 0) {
+          alert('No products to export.');
+          return;
+        }
+
+        const headers = ['Product Name', 'Category', 'Price (USD)', 'Stock', 'Sell by bot', 'Status', 'Image URL', 'Description'];
+        const rows = products.map(p => {
+          return [
+            `"${(p.name || '').replace(/"/g, '""')}"`,
+            `"${(p.category || '').replace(/"/g, '""')}"`,
+            p.price,
+            p.stock_quantity,
+            p.is_sellable ? 'SELLING' : 'DEACTIVATE',
+            p.is_active ? 'ACTIVE' : 'DRAFT',
+            `"${(p.image_url || '').replace(/"/g, '""')}"`,
+            `"${(p.description || '').replace(/"/g, '""')}"`
+          ].join(',');
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + '\n' + rows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const a = document.createElement('a');
+        a.setAttribute('href', encodedUri);
+        a.setAttribute('download', 'blockscom_inventory_export.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+      } catch (err) {
+        alert('Failed to construct export file: ' + err.message);
+      }
     }
 
     async function updateInventoryKb(products) {
