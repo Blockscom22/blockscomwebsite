@@ -19,12 +19,16 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Load Env
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const PORT = process.env.PORT || 3000;
+
+if (!process.env.SUPABASE_URL) {
+  console.warn("WARNING: SUPABASE_URL is missing! Requests to DB will fail. Add it in Vercel settings.");
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -94,14 +98,14 @@ async function requireAuth(req, res, next) {
   if (error || !user) return res.status(401).json({ error: 'Invalid session' });
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-  
+
   if (!profile) {
     const { data: newProfile } = await supabase.from('profiles').insert([{ id: user.id, email: user.email }]).select().single();
     req.user = { ...user, profile: newProfile };
   } else {
     req.user = { ...user, profile };
   }
-  
+
   next();
 }
 
@@ -126,10 +130,10 @@ app.put('/api/me/pin', requireAuth, async (req, res) => {
 app.get('/api/pages', requireAuth, async (req, res) => {
   const query = supabase.from('fb_pages').select('*').order('created_at', { ascending: false });
   if (req.user.profile.role !== 'ADMIN') query.eq('profile_id', req.user.id);
-  
+
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  
+
   const masked = data.map(p => ({
     ...p,
     access_token: maskSecret(p.access_token),
@@ -143,14 +147,14 @@ app.get('/api/pages', requireAuth, async (req, res) => {
 app.post('/api/pages', requireAuth, async (req, res) => {
   try {
     const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base, openrouter_key } = req.body;
-    
+
     if (id) {
       // Update
       const updates = { name, fb_page_id, ai_model, knowledge_base };
       if (verify_token && !isMasked(verify_token)) updates.verify_token = encryptSecret(verify_token);
       if (access_token && !isMasked(access_token)) updates.access_token = encryptSecret(access_token);
       if (openrouter_key && !isMasked(openrouter_key)) updates.openrouter_key = encryptSecret(openrouter_key);
-      
+
       const { error } = await supabase.from('fb_pages').update(updates).eq('id', id).eq('profile_id', req.user.id);
       if (error) throw error;
     } else {
@@ -168,7 +172,7 @@ app.post('/api/pages', requireAuth, async (req, res) => {
       }]);
       if (error) throw error;
     }
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('API Error (/api/pages):', error);
@@ -186,7 +190,7 @@ app.delete('/api/pages/:id', requireAuth, async (req, res) => {
 app.get('/api/knowledge', requireAuth, async (req, res) => {
   const query = supabase.from('knowledge_entries').select('*');
   if (req.user.profile.role !== 'ADMIN') query.eq('profile_id', req.user.id);
-  
+
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -195,13 +199,13 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
 app.post('/api/knowledge', requireAuth, async (req, res) => {
   const { id, title, content } = req.body;
   let result;
-  
+
   if (id) {
     result = await supabase.from('knowledge_entries').update({ title, content }).eq('id', id).eq('profile_id', req.user.id);
   } else {
     result = await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title, content }]);
   }
-  
+
   if (result.error) return res.status(500).json({ error: result.error.message });
   res.json({ success: true });
 });
@@ -225,10 +229,10 @@ app.post('/api/kb/scan-files', requireAuth, async (req, res) => {
     for (const file of files) {
       const content = fs.readFileSync(path.join(kbDir, file), 'utf8');
       const title = file.replace('.md', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      
+
       // Check if already exists
       const { data: existing } = await supabase.from('knowledge_entries').select('id').eq('profile_id', req.user.id).eq('title', title).single();
-      
+
       if (!existing) {
         await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title, content }]);
         count++;
@@ -262,7 +266,7 @@ app.get('/api/logs', requireAuth, async (req, res) => {
   const query = supabase.from('activity_logs').select('*, fb_pages(name, profile_id)').order('created_at', { ascending: false }).limit(100);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  
+
   const filtered = req.user.profile.role === 'ADMIN' ? data : data.filter(l => l.fb_pages?.profile_id === req.user.id);
   res.json(filtered);
 });
@@ -316,10 +320,10 @@ app.post('/api/widget/message', async (req, res) => {
       .select('*')
       .eq('profile_id', page.profile_id)
       .eq('is_active', true);
-    
+
     let productCatalog = "";
     if (products && products.length > 0) {
-      productCatalog = "\n\nPRODUCT CATALOG:\n" + products.map(p => 
+      productCatalog = "\n\nPRODUCT CATALOG:\n" + products.map(p =>
         `- ${p.name}: ${p.description} (Price: $${p.price}, Stock: ${p.stock_quantity})`
       ).join('\n');
     }
@@ -390,13 +394,13 @@ async function processMessage(event, fbPageId) {
     // 3. Build Context (Knowledge Base)
     console.log(`[DEBUG] Building knowledge base for user ${page.profile_id}...`);
     let kbQuery = supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id);
-    
+
     // Filter by specific files if defined
     if (Array.isArray(page.knowledge_base) && page.knowledge_base.length > 0) {
-       console.log(`[DEBUG] Filtering KB by titles: ${page.knowledge_base.join(', ')}`);
-       kbQuery = kbQuery.in('title', page.knowledge_base);
+      console.log(`[DEBUG] Filtering KB by titles: ${page.knowledge_base.join(', ')}`);
+      kbQuery = kbQuery.in('title', page.knowledge_base);
     }
-    
+
     const { data: kb, error: kbError } = await kbQuery;
     if (kbError) console.error(`[ERROR] KB Query failed:`, kbError);
     const context = (kb || []).map(k => k.content).join('\n\n');
@@ -409,12 +413,12 @@ async function processMessage(event, fbPageId) {
       .select('*')
       .eq('profile_id', page.profile_id)
       .eq('is_active', true);
-    
+
     let productCatalog = "";
     if (prodError) {
       console.warn(`[WARN] Products query failed (table might not exist yet):`, prodError.message);
     } else if (products && products.length > 0) {
-      productCatalog = "\n\nPRODUCT CATALOG:\n" + products.map(p => 
+      productCatalog = "\n\nPRODUCT CATALOG:\n" + products.map(p =>
         `- ${p.name}: ${p.description} (Price: $${p.price}, Stock: ${p.stock_quantity})`
       ).join('\n');
     }
@@ -440,8 +444,8 @@ async function processMessage(event, fbPageId) {
       {
         model: page.ai_model || 'openai/gpt-5.2', // Fallback model
         messages: [
-          { 
-            role: 'system', 
+          {
+            role: 'system',
             content: `You are a helpful AI assistant for the Facebook page "${page.name}".
             
             KNOWLEDGE BASE:
@@ -453,7 +457,7 @@ async function processMessage(event, fbPageId) {
             - If a user asks about products, recommend items from the catalog.
             - Be polite and professional.
             - Keep answers concise for chat.
-            ` 
+            `
           },
           { role: 'user', content: messageText }
         ]
@@ -493,7 +497,7 @@ async function processMessage(event, fbPageId) {
     }]);
 
     if (userProfile && userProfile.role !== 'ADMIN') {
-       await supabase.from('profiles').update({ credits: (userProfile.credits || 0) - 1 }).eq('id', page.profile_id);
+      await supabase.from('profiles').update({ credits: (userProfile.credits || 0) - 1 }).eq('id', page.profile_id);
     }
 
   } catch (err) {
@@ -512,7 +516,7 @@ app.get('/webhook', async (req, res) => {
 
   if (mode === 'subscribe' && token) {
     const { data: pages, error } = await supabase.from('fb_pages').select('verify_token');
-    
+
     if (error) {
       console.error('Webhook verification DB error:', error);
       return res.sendStatus(500);
@@ -545,7 +549,7 @@ app.post('/webhook', async (req, res) => {
     for (const entry of body.entry) {
       // Get the page ID from the entry
       const fbPageId = entry.id;
-      
+
       // Handle messaging events
       if (entry.messaging) {
         for (const event of entry.messaging) {
