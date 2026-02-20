@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockscom | Build Intelligent Systems</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Oswald:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #09090b;
+            --surface: #121216;
+            --text-main: #f4f4f5;
+            --text-dim: #a1a1aa;
+            --accent: #ffffff;
+            --border: #27272a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            background-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Nav */
+        nav {
+            position: fixed;
+            top: 0; width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 48px;
+            z-index: 100;
+            /* mask for smooth scroll overlay */
+            background: linear-gradient(to bottom, rgba(9,9,11,1) 0%, rgba(9,9,11,0) 100%);
+        }
+        
+        @media (max-width: 768px) {
+            nav { padding: 20px 24px; flex-direction: column; gap: 16px; }
+        }
+
+        .logo {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+        }
+        .logo span { color: var(--text-dim); }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+        .nav-links a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: color 0.3s;
+        }
+        .nav-links a:hover { color: var(--text-dim); }
+        .nav-cta {
+            padding: 8px 24px;
+            border: 1px solid var(--border);
+            border-radius: 99px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .nav-cta:hover {
+            background: var(--text-main);
+            color: var(--bg);
+            border-color: var(--text-main);
+        }
+
+        /* Typography */
+        h1, h2, h3 { font-family: 'Inter', sans-serif; }
+        
+        .huge-text {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(60px, 15vw, 240px);
+            line-height: 0.85;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            word-wrap: break-word;
+            margin: 0;
+            padding: 0;
+            text-align: left;
+        }
+        
+        .huge-text.outline {
+            color: var(--bg);
+            -webkit-text-stroke: 2px #3f3f46;
+            margin-top: -10px;
+        }
+
+        /* Layout */
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 0 48px;
+        }
+        @media (max-width: 768px) { .container { padding: 0 24px; } }
+
+        section {
+            padding: 120px 0;
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        /* Hero Section */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+            padding-top: 100px;
+        }
+
+        .hero-bg-glow {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px; height: 800px;
+            background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(9,9,11,0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .hero-bottom-grid {
+            margin-top: 60px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+        @media (max-width: 900px) { .hero-bottom-grid { grid-template-columns: 1fr; } }
+        
+        .hero-desc {
+            font-size: 1.1rem;
+            color: var(--text-dim);
+            max-width: 480px;
+            text-wrap: balance;
+        }
+
+        .cta-container {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        @media (max-width: 500px) { .cta-container { flex-direction: column; align-items: stretch;} }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px 32px;
+            border-radius: 99px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: var(--text-main);
+            color: var(--bg);
+            border: 1px solid var(--text-main);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(255, 255, 255, 0.1);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover {
+            background: var(--surface);
+            border-color: var(--text-dim);
+        }
+
+        /* General Section Styling */
+        .section-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+            max-width: 100px;
+        }
+        
+        .section-title {
+            font-size: clamp(32px, 5vw, 64px);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            margin-bottom: 40px;
+            max-width: 900px;
+            text-wrap: balance;
+        }
+
+        .text-body {
+            font-size: 1.25rem;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin-bottom: 24px;
+        }
+        .text-body.highlight { color: var(--text-main); font-weight: 500;}
+
+        /* Grid Cards */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 60px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at top right, rgba(255,255,255,0.05) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #3f3f46;
+        }
+        .card:hover::before { opacity: 1; }
+        
+        .card h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        .card p { color: var(--text-dim); font-size: 1rem; }
+
+        /* Process Steps */
+        .process-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin-top: 40px;
+            border-top: 1px solid var(--border);
+        }
+        .process-item {
+            display: grid;
+            grid-template-columns: 100px 1fr 2fr;
+            gap: 24px;
+            padding: 40px 0;
+            border-bottom: 1px solid var(--border);
+            align-items: start;
+        }
+        @media (max-width: 768px) {
+            .process-item { grid-template-columns: 1fr; gap: 12px; padding: 32px 0; }
+        }
+        .process-num {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            color: var(--text-dim);
+        }
+        .process-item h3 { font-size: 1.5rem; }
+        .process-item p { color: var(--text-dim); font-size: 1.1rem; }
+
+        /* Lists */
+        .bullet-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 40px;
+        }
+        .bullet-list li {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: var(--text-dim);
+            transition: color 0.3s;
+        }
+        .bullet-list li:hover { color: var(--text-main); }
+        .bullet-list li::before {
+            content: '';
+            width: 8px; height: 8px;
+            background: var(--text-main);
+            border-radius: 50%;
+        }
+
+        /* Huge Text Split */
+        .huge-split {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        /* Footer CTA */
+        .footer-cta {
+            text-align: center;
+            padding: 160px 24px;
+            border-top: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        .footer-bg {
+            position: absolute;
+            bottom: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 100%; height: 500px;
+            background: radial-gradient(circle at bottom, rgba(255,255,255,0.05) 0%, transparent 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Animations */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .char-reveal span {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(50px);
+            animation: textUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes textUp { to { opacity: 1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="/" style="text-decoration:none; color:inherit;">
+            <div class="logo">BLOCKSCOM<span>OS</span></div>
+        </a>
+        <div class="nav-links">
+            <a href="#about">About</a>
+            <a href="#capabilities">Stack</a>
+            <a href="#process">Process</a>
+            <a href="/login" class="nav-cta">Client Login</a>
+        </div>
+    </nav>
+
+    <div class="hero-bg-glow"></div>
+
+    <section class="hero container">
+        <div class="huge-split">
+            <h1 class="huge-text char-wrapper" id="hero-title1">INTELLIGENT</h1>
+            <h1 class="huge-text outline char-wrapper" id="hero-title2">SYSTEMS</h1>
+        </div>
+
+        <div class="hero-bottom-grid reveal">
+            <p class="hero-desc">
+                Blockscom designs and deploys AI-powered automation systems that replace manual workflows, connect your tools, and run your business processes 24/7.
+            </p>
+            <div class="cta-container">
+                <a href="#contact" class="btn btn-primary">Book a Strategy Call</a>
+                <a href="#capabilities" class="btn btn-secondary">See Our Systems</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 1 -->
+    <section id="about" class="container">
+        <div class="section-label reveal">What We Actually Do</div>
+        <h2 class="section-title reveal">We Engineer Business Intelligence Infrastructure</h2>
+        <div class="reveal">
+            <p class="text-body highlight">Most companies use AI as a tool.<br>We use AI as the operating layer of your business.</p>
+            <p class="text-body">Blockscom builds fully integrated automation ecosystems — combining AI agents, APIs, databases, messaging platforms, and cloud infrastructure into one cohesive system that works autonomously.</p>
+            <p class="text-body">From lead generation to internal operations, from CRM automation to AI decision engines — we design systems that execute, not just assist.</p>
+        </div>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section id="capabilities" class="container">
+        <div class="section-label reveal">Our Core Capabilities</div>
+        <h2 class="section-title reveal">Our Automation Stack</h2>
+        
+        <div class="bento-grid">
+            <div class="card reveal" style="transition-delay: 0.1s;">
+                <h3>AI Agent Architecture</h3>
+                <p>Custom AI agents that can reason, retrieve memory, execute tools, and automate multi-step workflows.</p>
+            </div>
+            <div class="card reveal" style="transition-delay: 0.2s;">
+                <h3>Workflow Automation</h3>
+                <p>Advanced automation across CRM, email, messaging, marketing systems, and internal tools.</p>
+            </div>
+            <div class="card reveal" style="transition-delay: 0.3s;">
+                <h3>System Integration</h3>
+                <p>We connect your ecosystem — Telegram, WhatsApp, ConvertKit, Kajabi, Google Workspace, databases, APIs — into a single automated pipeline.</p>
+            </div>
+            <div class="card reveal" style="transition-delay: 0.4s;">
+                <h3>Deployment & Infrastructure</h3>
+                <p>VPS deployment, Docker environments, reverse proxies, security configuration, monitoring, and scaling.</p>
+            </div>
+            <div class="card reveal" style="grid-column: 1 / -1; transition-delay: 0.5s;">
+                <h3>24/7 Autonomous Operations</h3>
+                <p>Systems that monitor, respond, trigger, escalate, and optimize — even while you sleep.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 3 -->
+    <section id="process" class="container">
+        <div class="section-label reveal">How We Build</div>
+        <h2 class="section-title reveal">Our System-Building Process</h2>
+
+        <div class="process-list">
+            <div class="process-item reveal">
+                <div class="process-num">01</div>
+                <h3>Architecture Design</h3>
+                <p>We analyze your workflow and design the automation logic structure.</p>
+            </div>
+            <div class="process-item reveal">
+                <div class="process-num">02</div>
+                <h3>AI Integration</h3>
+                <p>We implement AI reasoning layers and memory systems.</p>
+            </div>
+            <div class="process-item reveal">
+                <div class="process-num">03</div>
+                <h3>Automation Deployment</h3>
+                <p>We connect APIs, build triggers, and configure execution flows.</p>
+            </div>
+            <div class="process-item reveal">
+                <div class="process-num">04</div>
+                <h3>Infrastructure Setup</h3>
+                <p>Secure cloud deployment with monitoring and auto-updates.</p>
+            </div>
+            <div class="process-item reveal">
+                <div class="process-num">05</div>
+                <h3>Optimization</h3>
+                <p>We refine performance, reduce token costs, and improve system efficiency.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 4 & 5 -->
+    <section class="container">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 80px;">
+            <div>
+                <div class="section-label reveal">Who We Help</div>
+                <h2 class="section-title reveal" style="font-size:clamp(24px, 3vw, 40px)">Built for Businesses That Think Long-Term</h2>
+                <ul class="bullet-list reveal">
+                    <li>AI-first startups</li>
+                    <li>Agencies scaling operations</li>
+                    <li>Marketing teams needing intelligent automation</li>
+                    <li>Enterprises exploring AI infrastructure</li>
+                    <li>Founders replacing manual workflows</li>
+                </ul>
+            </div>
+            <div>
+                <div class="section-label reveal">Why Blockscom</div>
+                <h2 class="section-title reveal" style="font-size:clamp(24px, 3vw, 40px)">We Don’t Build Bots.<br>We Build Operating Systems.</h2>
+                <div class="reveal">
+                    <p class="text-body">Most automation fails because it’s stitched together.</p>
+                    <p class="text-body">Blockscom designs from the architecture layer first — ensuring:</p>
+                    <ul class="bullet-list" style="margin-top:20px; margin-bottom: 24px;">
+                        <li>Stability</li>
+                        <li>Scalability</li>
+                        <li>Security</li>
+                        <li>Modular growth</li>
+                        <li>Cost efficiency</li>
+                    </ul>
+                    <p class="text-body highlight">We engineer systems that evolve with your business.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 6 -->
+    <section id="contact" class="footer-cta">
+        <div class="footer-bg"></div>
+        <div class="container" style="max-width: 800px; position:relative; z-index:2;">
+            <h2 class="huge-text outline reveal" style="font-size: clamp(40px, 8vw, 120px); text-align: center; line-height: 1.1; margin-bottom:24px;">READY TO AUTOMATE<br>THE RIGHT WAY?</h2>
+            <p class="text-body reveal" style="margin: 0 auto 40px auto; text-align: center; color: var(--text-main);">
+                Stop hiring more people to solve process problems.<br>Install intelligent systems instead.
+            </p>
+            <div class="cta-container reveal" style="justify-content: center;">
+                <a href="#contact" class="btn btn-primary" style="padding: 20px 40px; font-size:1.1rem;">Schedule a Consultation</a>
+                <a href="#contact" class="btn btn-secondary" style="padding: 20px 40px; font-size:1.1rem;">Request Custom Blueprint</a>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Hero Text Animation
+        const wrapChars = (selector, delayOffset = 0) => {
+            const el = document.querySelector(selector);
+            const text = el.textContent;
+            el.innerHTML = '';
+            [...text].forEach((char, i) => {
+                const span = document.createElement('span');
+                span.textContent = char === ' ' ? '\u00A0' : char;
+                span.style.animationDelay = `${(i * 0.05) + delayOffset}s`;
+                el.appendChild(span);
+            });
+            el.classList.add('char-reveal');
+        };
+        wrapChars('#hero-title1', 0);
+        wrapChars('#hero-title2', 0.5);
+
+        // Scroll Reveal Animation
+        const revealConfig = { root: null, rootMargin: '0px', threshold: 0.15 };
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, revealConfig);
+        
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    </script>
+</body>
+</html>
