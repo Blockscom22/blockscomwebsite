@@ -815,6 +815,10 @@
   <script src="/config-client.js"></script>
   <script>
     const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    function escapeHtml(unsafe) {
+      if (typeof unsafe !== 'string') return unsafe;
+      return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
     let currentSession = null;
     let me = null;
     let kbOptions = [];
@@ -909,8 +913,12 @@
       if (!data.session) { window.location.href = '/login'; return; }
       currentSession = data.session;
 
+      // Get URL params for view routing
+      const urlParams = new URLSearchParams(window.location.search);
+      const viewToLoad = urlParams.get('view') || 'pages';
+
       // Render structure instantly, start background tasks
-      showView('pages');
+      showView(viewToLoad);
 
       // Fetch user profile asynchronously and populate
       fetch('/api/me', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } })
@@ -972,7 +980,7 @@
       list.innerHTML = pagesCache.map(p => `
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px">
-            <div><div style="font-weight:700; font-size:1.1rem">${p.name}</div><div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">ID: ${p.fb_page_id}</div></div>
+            <div><div style="font-weight:700; font-size:1.1rem">${escapeHtml(p.name)}</div><div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">ID: ${escapeHtml(p.fb_page_id)}</div></div>
             <div class="badge ${p.is_enabled ? 'badge-premium' : 'badge-free'}">${p.is_enabled ? 'Active' : 'Disabled'}</div>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
@@ -1026,13 +1034,13 @@
       list.innerHTML = kbOptions.map(k => `
         <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:16px">
-             <div style="font-weight:700; font-size:1rem">${k.title}</div>
+             <div style="font-weight:700; font-size:1rem">${escapeHtml(k.title)}</div>
              <div style="display:flex; gap:8px; align-items:center;">
                ${k.title === 'Product Catalog' ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.70rem;" onclick="forceSyncProducts()">⟳ Sync</button>` : ''}
                <div class="badge badge-free">Skill Entry ${k.title === 'Product Catalog' ? '(Synced)' : ''}</div>
              </div>
           </div>
-          <div style="font-size:0.85rem; color:var(--text-dim); height:60px; overflow:hidden; mask-image:linear-gradient(to bottom, black 50%, transparent 100%)">${k.content}</div>
+          <div style="font-size:0.85rem; color:var(--text-dim); height:60px; overflow:hidden; mask-image:linear-gradient(to bottom, black 50%, transparent 100%)">${escapeHtml(k.content)}</div>
           <div style="display:flex; gap:10px; margin-top:20px">
             <button class="btn btn-secondary" style="flex:1" onclick="openKbModal('${k.id}')">Edit Skill</button>
             <button class="btn btn-danger" onclick="deleteKb('${k.id}')">Del</button>
@@ -1058,13 +1066,13 @@
       document.getElementById('logs-table').innerHTML = logs.map(l => `
         <tr>
           <td style="color:var(--text-dim); white-space:nowrap">${new Date(l.created_at).toLocaleTimeString()}</td>
-          <td style="font-weight:600">${l.fb_pages?.name || '---'}</td>
+          <td style="font-weight:600">${escapeHtml(l.fb_pages?.name || '---')}</td>
           <td><span class="badge badge-free">${l.type}</span></td>
           <td style="max-width:400px; font-size:0.85rem; line-height:1.4;">
             ${l.payload ? `
-              ${l.payload.sender ? `<div style="font-size:0.7rem; color:var(--primary); font-family:monospace; margin-bottom:4px;">Sender ID: ${l.payload.sender}</div>` : ''}
-              ${l.payload.in ? `<div style="margin-bottom:4px;"><strong>User:</strong> <span style="color:var(--text-dim);">${l.payload.in}</span></div>` : ''}
-              ${l.payload.out ? `<div><strong>AI:</strong> <span style="color:var(--text);">${l.payload.out}</span></div>` : ''}
+              ${l.payload.sender ? `<div style="font-size:0.7rem; color:var(--primary); font-family:monospace; margin-bottom:4px;">Sender ID: ${escapeHtml(l.payload.sender)}</div>` : ''}
+              ${l.payload.in ? `<div style="margin-bottom:4px;"><strong>User:</strong> <span style="color:var(--text-dim);">${escapeHtml(l.payload.in)}</span></div>` : ''}
+              ${l.payload.out ? `<div><strong>AI:</strong> <span style="color:var(--text);">${escapeHtml(l.payload.out)}</span></div>` : ''}
             ` : 'No payload data'}
           </td>
         </tr>
@@ -1169,7 +1177,7 @@
       const users = await res.json();
       document.getElementById('admin-users').innerHTML = users.map(u => `
         <tr>
-          <td><div style="font-weight:600">${u.email}</div><div style="font-size:0.7rem; color:var(--text-dim)">${u.id}</div></td>
+          <td><div style="font-weight:600">${escapeHtml(u.email)}</div><div style="font-size:0.7rem; color:var(--text-dim)">${u.id}</div></td>
           <td><span class="badge ${u.role === 'ADMIN' ? 'badge-premium' : 'badge-free'}">${u.role}</span></td>
           <td style="font-weight:700">${u.credits.toLocaleString()}</td>
           <td><button class="btn btn-secondary" onclick="editUser('${u.id}', ${u.credits}, '${u.role}')">Manage</button></td>
@@ -1215,11 +1223,11 @@
         <tr>
           <td>
             <div style="width: 40px; height: 40px; border-radius: 6px; background: var(--surface-elevated); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border);">
-              ${p.image_url ? `<img src="${p.image_url}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.outerHTML='<span style=\\'font-size: 10px; color: var(--text-dim)\\'>No Img</span>'">` : '<span style="font-size: 10px; color: var(--text-dim)">No Img</span>'}
+              ${p.image_url ? `<img src="${encodeURI(p.image_url)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.outerHTML='<span style=\\'font-size: 10px; color: var(--text-dim)\\'>No Img</span>'">` : '<span style="font-size: 10px; color: var(--text-dim)">No Img</span>'}
             </div>
           </td>
-          <td><div style="font-weight:600">${p.name}</div><div style="font-size:0.7rem; color:var(--text-dim); max-width:200px; overflow:hidden; text-overflow:ellipsis">${p.description || ''}</div></td>
-          <td><span class="badge badge-free">${p.category || 'N/A'}</span></td>
+          <td><div style="font-weight:600">${escapeHtml(p.name)}</div><div style="font-size:0.7rem; color:var(--text-dim); max-width:200px; overflow:hidden; text-overflow:ellipsis">${escapeHtml(p.description || '')}</div></td>
+          <td><span class="badge badge-free">${escapeHtml(p.category || 'N/A')}</span></td>
           <td style="font-weight:700">${formatPrice(p.price)}</td>
           <td>${p.stock_quantity}</td>
           <td><span class="badge ${p.is_sellable ? 'badge-premium' : 'badge-free'}">${p.is_sellable ? 'Selling' : 'Manual'}</span></td>
@@ -1575,9 +1583,9 @@
       const list = document.getElementById('kb-selector-list');
       // Filter out 'prod:' and 'cat:' selections from the basic kb list
       list.innerHTML = options.filter(k => k.title !== 'Product Catalog').map(k => `
-        <label class="kb-checkbox" data-title="${k.title.toLowerCase()}">
-          <input type="checkbox" value="${k.title}" ${selectedSet.has(k.title) ? 'checked' : ''}>
-          <span>${k.title}</span>
+        <label class="kb-checkbox" data-title="${escapeHtml(k.title.toLowerCase())}">
+          <input type="checkbox" value="${escapeHtml(k.title)}" ${selectedSet.has(k.title) ? 'checked' : ''}>
+          <span>${escapeHtml(k.title)}</span>
         </label>
       `).join('') || '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">No knowledge skills found. Create some in the Knowledge Base tab.</p>';
     }
@@ -1598,18 +1606,18 @@
         let html = '';
         if (categories.length > 0) {
           html += categories.map(c => `
-            <label class="kb-checkbox" data-title="cat:${c.toLowerCase()}" style="border-left: 3px solid var(--primary)">
-              <input type="checkbox" value="cat:${c}" ${selectedSet.has(`cat:${c}`) ? 'checked' : ''}>
-              <span>📦 Category: ${c}</span>
+            <label class="kb-checkbox" data-title="cat:${escapeHtml(c.toLowerCase())}" style="border-left: 3px solid var(--primary)">
+              <input type="checkbox" value="cat:${escapeHtml(c)}" ${selectedSet.has(`cat:${c}`) ? 'checked' : ''}>
+              <span>📦 Category: ${escapeHtml(c)}</span>
             </label>
           `).join('');
         }
 
         if (products.length > 0) {
           html += products.map(p => `
-            <label class="kb-checkbox" data-title="prod:${p.name.toLowerCase()}">
-              <input type="checkbox" value="prod:${p.name}" ${selectedSet.has(`prod:${p.name}`) ? 'checked' : ''}>
-              <span>${p.name} <span style="font-size:0.7rem; color:var(--text-dim)">(${p.category || 'General'})</span></span>
+            <label class="kb-checkbox" data-title="prod:${escapeHtml(p.name.toLowerCase())}">
+              <input type="checkbox" value="prod:${escapeHtml(p.name)}" ${selectedSet.has(`prod:${p.name}`) ? 'checked' : ''}>
+              <span>${escapeHtml(p.name)} <span style="font-size:0.7rem; color:var(--text-dim)">(${escapeHtml(p.category || 'General')})</span></span>
             </label>
           `).join('');
         }

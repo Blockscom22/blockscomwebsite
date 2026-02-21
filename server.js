@@ -42,6 +42,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Secret encryption helpers (AES-256-GCM)
 const ENC_KEY = crypto.createHash('sha256').update(process.env.TOKEN_ENCRYPTION_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'blockscom-default-key').digest();
+if (!process.env.TOKEN_ENCRYPTION_KEY) {
+  console.warn("SECURITY WARNING: TOKEN_ENCRYPTION_KEY is not set. Falling back to SUPABASE_SERVICE_ROLE_KEY or default string for encryption. It is recommended to set a dedicated TOKEN_ENCRYPTION_KEY in production.");
+}
 
 function encryptSecret(plain) {
   if (!plain) return null;

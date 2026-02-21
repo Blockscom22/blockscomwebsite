@@ -309,6 +309,12 @@
             <a href="/orders.html" class="nav-item active">Orders</a>
         </div>
 
+        <div class="nav-group">
+            <div class="nav-label">Settings</div>
+            <a href="/dashboard.html?view=settings" class="nav-item">Platform Settings</a>
+            <a href="/dashboard.html?view=admin" id="admin-nav" class="nav-item" style="display:none">Admin Controls</a>
+        </div>
+
         <div class="user-card">
             <div id="u-tier" class="user-tier">TIER: FREE</div>
             <div id="u-email" class="user-email">...</div>
@@ -373,6 +379,7 @@
                     const me = await res.json();
                     document.getElementById('u-email').innerText = me.email;
                     document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
+                    if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
 
                     loadOrders();
                 })
