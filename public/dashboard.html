@@ -911,6 +911,21 @@
       if (!data.session) { window.location.href = '/login'; return; }
       currentSession = data.session;
 
+      if (data.session.user && data.session.user.email) {
+        document.getElementById('u-email').innerText = data.session.user.email;
+      }
+
+      const cachedMeStr = localStorage.getItem('blockscom_user_profile');
+      if (cachedMeStr) {
+        try {
+          const cachedMe = JSON.parse(cachedMeStr);
+          document.getElementById('u-tier').innerText = `TIER: ${cachedMe.role}`;
+          document.getElementById('u-credits').innerText = `Credits: ${cachedMe.credits.toLocaleString()}`;
+          if (cachedMe.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+          if (cachedMe.currency) displayCurrency = cachedMe.currency;
+        } catch (e) { }
+      }
+
       // Get URL params for view routing
       const urlParams = new URLSearchParams(window.location.search);
       const viewToLoad = urlParams.get('view') || 'pages';
@@ -923,6 +938,7 @@
         .then(async res => {
           if (!res.ok) { logout(); return; }
           me = await res.json();
+          localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
 
           if (me.currency) {
             displayCurrency = me.currency;

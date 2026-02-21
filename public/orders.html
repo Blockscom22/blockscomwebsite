@@ -373,15 +373,30 @@
             if (!data.session) { window.location.href = '/login'; return; }
             currentSession = data.session;
 
+            if (data.session.user && data.session.user.email) {
+                document.getElementById('u-email').innerText = data.session.user.email;
+            }
+
+            const cachedMeStr = localStorage.getItem('blockscom_user_profile');
+            if (cachedMeStr) {
+                try {
+                    const cachedMe = JSON.parse(cachedMeStr);
+                    document.getElementById('u-tier').innerText = `TIER: ${cachedMe.role}`;
+                    if (cachedMe.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+                } catch (e) { }
+            }
+
+            loadOrders();
+
             fetch('/api/me', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } })
                 .then(async res => {
                     if (!res.ok) { logout(); return; }
                     const me = await res.json();
+                    localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
+
                     document.getElementById('u-email').innerText = me.email;
                     document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
                     if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
-
-                    loadOrders();
                 })
                 .catch(console.error);
         }
