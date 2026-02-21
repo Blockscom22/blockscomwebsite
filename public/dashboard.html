@@ -1910,6 +1910,25 @@
     }
 
     async function saveKb() {
+      const isNew = !document.getElementById('kb-id-hidden').value;
+
+      if (isNew) {
+        // Enforce limits on the frontend before saving
+        const roleLimits = {
+          'FREE': 1,
+          'PREMIUM': 10,
+          'ENTERPRISE': 20,
+          'ADMIN': 99999
+        };
+        const userRole = me?.role || 'FREE';
+        const limit = roleLimits[userRole] || 1;
+
+        if (kbOptions.length >= limit) {
+          alert(`Your current tier (${userRole}) is limited to ${limit} Knowledge Base item(s). Please upgrade to add more.`);
+          return;
+        }
+      }
+
       const body = {
         id: document.getElementById('kb-id-hidden').value || undefined,
         title: document.getElementById('kb-title').value,
@@ -1918,6 +1937,8 @@
 
       closeModal('kbModal');
 
+      // Optimistic update
+      let backupKbOptions = [...kbOptions];
       if (body.id) {
         const idx = kbOptions.findIndex(k => k.id === body.id);
         if (idx > -1) kbOptions[idx] = { ...kbOptions[idx], ...body };
@@ -1926,8 +1947,27 @@
       }
       renderKbListBase();
 
-      fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) })
-        .then(() => loadKb());
+      try {
+        const res = await fetch('/api/knowledge', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.access_token}`
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Failed to save knowledge base item.');
+        }
+        await loadKb();
+      } catch (err) {
+        alert(err.message);
+        // Rollback optimistic update on error
+        kbOptions = backupKbOptions;
+        renderKbListBase();
+      }
     }
 
     async function updatePassword() {

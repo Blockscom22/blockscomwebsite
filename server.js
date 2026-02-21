@@ -221,8 +221,27 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
-  // Auto-generate Default Skill if empty (and not an admin viewing all skills)
+  // Auto-generate Default Skills if empty (and not an admin viewing all skills)
   if (data.length === 0 && req.user.profile.role !== 'ADMIN') {
+    const fs = require('fs');
+    const kbDir = path.join(__dirname, 'data/knowledge');
+
+    if (fs.existsSync(kbDir)) {
+      const files = fs.readdirSync(kbDir).filter(f => f.endsWith('.md'));
+      const defaultInserts = [];
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(kbDir, file), 'utf8');
+        const title = file.replace('.md', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        defaultInserts.push({ profile_id: req.user.id, title, content });
+      }
+      if (defaultInserts.length > 0) {
+        await supabase.from('knowledge_entries').insert(defaultInserts);
+        const { data: newData } = await supabase.from('knowledge_entries').select('*').eq('profile_id', req.user.id);
+        return res.json(newData || []);
+      }
+    }
+
+    // Fallback if no files exist
     const defaultSkill = { profile_id: req.user.id, title: 'Default Skill', content: 'I am a helpful AI assistant. I should aim to be concise, friendly, and professional in my responses.' };
     await supabase.from('knowledge_entries').insert([defaultSkill]);
     const { data: newData } = await supabase.from('knowledge_entries').select('*').eq('profile_id', req.user.id);
@@ -239,6 +258,30 @@ app.post('/api/knowledge', requireAuth, async (req, res) => {
   if (id) {
     result = await supabase.from('knowledge_entries').update({ title, content }).eq('id', id).eq('profile_id', req.user.id);
   } else {
+    // Check limits before inserting a new skill
+    const roleLimits = {
+      'FREE': 1,
+      'PREMIUM': 10,
+      'ENTERPRISE': 20,
+      'ADMIN': 99999
+    };
+
+    const userRole = req.user.profile.role || 'FREE';
+    const limit = roleLimits[userRole] || 1;
+
+    const { count, error: countErr } = await supabase
+      .from('knowledge_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('profile_id', req.user.id);
+
+    if (countErr) {
+      return res.status(500).json({ error: countErr.message });
+    }
+
+    if (count >= limit) {
+      return res.status(403).json({ error: `Your current tier (${userRole}) is limited to ${limit} Knowledge Base item(s). Please upgrade to add more.` });
+    }
+
     result = await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title, content }]);
   }
 
