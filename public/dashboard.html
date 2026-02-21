@@ -648,11 +648,25 @@
           <table style="margin:0">
             <thead>
               <tr>
-                <th style="width: 50px;">Image</th>
-                <th>Product Name</th>
-                <th>Category</th>
-                <th id="price-th">Price (USD)</th>
-                <th>Stock</th>
+                <th style="width: 70px; display: flex; align-items: center; gap: 4px; border-bottom: none;"><input
+                    type="checkbox" id="sync-chk-image" checked onchange="forceSyncProducts()" title="Sync Image"> Image
+                </th>
+                <th><label
+                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
+                      type="checkbox" id="sync-chk-name" checked onchange="forceSyncProducts()" title="Sync Name">
+                    Product Name</label></th>
+                <th><label
+                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
+                      type="checkbox" id="sync-chk-category" checked onchange="forceSyncProducts()"
+                      title="Sync Category"> Category</label></th>
+                <th id="price-th"><label
+                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
+                      type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price">
+                    Price (USD)</label></th>
+                <th><label
+                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
+                      type="checkbox" id="sync-chk-stock" checked onchange="forceSyncProducts()" title="Sync Stock">
+                    Stock</label></th>
                 <th>Sell by Bot</th>
                 <th>Status</th>
                 <th style="text-align:right">Management</th>
@@ -970,7 +984,7 @@
 
     async function updateCurrency() {
       displayCurrency = document.getElementById('currency-selector').value;
-      document.getElementById('price-th').innerText = `Price (${displayCurrency})`;
+      document.getElementById('price-th').innerHTML = `<label style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price"> Price (${displayCurrency})</label>`;
 
       // Save to database
       try {
@@ -1077,7 +1091,7 @@
           if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
 
           await loadRates();
-          document.getElementById('price-th').innerText = `Price (${displayCurrency})`;
+          document.getElementById('price-th').innerHTML = `<label style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price"> Price (${displayCurrency})</label>`;
 
           syncProductsToKb();
         })
@@ -1675,13 +1689,42 @@
     }
 
     async function updateInventoryKb(products) {
+      const includeImage = document.getElementById('sync-chk-image')?.checked ?? true;
+      const includeName = document.getElementById('sync-chk-name')?.checked ?? true;
+      const includeCategory = document.getElementById('sync-chk-category')?.checked ?? true;
+      const includePrice = document.getElementById('sync-chk-price')?.checked ?? true;
+      const includeStock = document.getElementById('sync-chk-stock')?.checked ?? true;
+
       const title = "Product Catalog";
       let md = `# Store Catalog (Currency: ${displayCurrency})\n\n`;
-      products.filter(p => p.is_active && p.is_sellable).forEach(p => {
-        md += `### ${p.name}\n- **Price**: ${formatPrice(p.price)}\n- **Category**: ${p.category || 'General'}\n- **Stock**: ${p.stock_quantity > 0 ? 'Available (' + p.stock_quantity + ')' : 'Sold Out'}\n- **Description**: ${p.description || 'No description available.'}\n\n`;
+
+      const filteredProducts = products.filter(p => p.is_active && p.is_sellable).map(p => {
+        let np = { ...p };
+        if (!includeImage) delete np.image_url;
+        if (!includeName) delete np.name;
+        if (!includeCategory) delete np.category;
+        if (!includePrice) delete np.price;
+        if (!includeStock) delete np.stock_quantity;
+        return np;
+      });
+
+      filteredProducts.forEach(p => {
+        let lines = [];
+        if (includeName) md += `### ${p.name || 'Product ' + p.id}\n`;
+        else md += `### Product ${p.id}\n`;
+
+        if (includePrice && p.price !== undefined) lines.push(`- **Price**: ${formatPrice(p.price)}`);
+        if (includeCategory && p.category !== undefined) lines.push(`- **Category**: ${p.category || 'General'}`);
+        if (includeStock && p.stock_quantity !== undefined) lines.push(`- **Stock**: ${p.stock_quantity > 0 ? 'Available (' + p.stock_quantity + ')' : 'Sold Out'}`);
+
+        lines.push(`- **Description**: ${p.description || 'No description available.'}`);
+
+        if (includeImage && p.image_url) lines.push(`- **Image**: ${p.image_url}`);
+
+        md += lines.join('\n') + '\n\n';
       });
       md += `\n*Note: All prices are auto-converted from USD based on latest exchange rates.*\n\n`;
-      md += `<!-- DATABASE_START -->\n\`\`\`json\n${JSON.stringify(products, null, 2)}\n\`\`\`\n<!-- DATABASE_END -->`;
+      md += `<!-- DATABASE_START -->\n\`\`\`json\n${JSON.stringify(filteredProducts, null, 2)}\n\`\`\`\n<!-- DATABASE_END -->`;
 
       const { data: existing } = await sb.from('knowledge_entries').select('id').eq('profile_id', me.id).eq('title', title).single();
 
