@@ -156,8 +156,7 @@ app.get('/api/pages', requireAuth, async (req, res) => {
   const masked = data.map(p => ({
     ...p,
     access_token: maskSecret(p.access_token),
-    verify_token: maskSecret(p.verify_token),
-    openrouter_key: maskSecret(p.openrouter_key)
+    verify_token: maskSecret(p.verify_token)
   }));
   res.json(masked);
 });
@@ -175,14 +174,13 @@ app.put('/api/pages/theme', requireAuth, async (req, res) => {
 // API: Add/Update Page
 app.post('/api/pages', requireAuth, async (req, res) => {
   try {
-    const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base, openrouter_key } = req.body;
+    const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base } = req.body;
 
     if (id) {
       // Update
       const updates = { name, fb_page_id, ai_model, knowledge_base };
       if (verify_token && !isMasked(verify_token)) updates.verify_token = encryptSecret(verify_token);
       if (access_token && !isMasked(access_token)) updates.access_token = encryptSecret(access_token);
-      if (openrouter_key && !isMasked(openrouter_key)) updates.openrouter_key = encryptSecret(openrouter_key);
 
       const { error } = await supabase.from('fb_pages').update(updates).eq('id', id).eq('profile_id', req.user.id);
       if (error) throw error;
@@ -196,7 +194,6 @@ app.post('/api/pages', requireAuth, async (req, res) => {
         access_token: encryptSecret(access_token),
         ai_model,
         knowledge_base: knowledge_base || [],
-        openrouter_key: openrouter_key ? encryptSecret(openrouter_key) : null,
         widget_key: crypto.randomBytes(12).toString('hex')
       }]);
       if (error) throw error;
@@ -432,7 +429,7 @@ app.post('/api/logs/analyze', requireAuth, async (req, res) => {
     if (!resolvedApiKey) return res.status(500).json({ error: 'System OpenRouter API key not configured for analysis.' });
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-5.2',
+      model: 'openai/gpt-4o',
       messages: [
         {
           role: 'system',
@@ -530,7 +527,7 @@ app.post('/api/widget/message', async (req, res) => {
       ).join('\n');
     }
 
-    const resolvedApiKey = decryptSecret(page.openrouter_key) || process.env.OPENROUTER_API_KEY;
+    const resolvedApiKey = process.env.OPENROUTER_API_KEY;
     if (!resolvedApiKey) return res.status(500).json({ error: 'missing OpenRouter key' });
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
@@ -730,7 +727,7 @@ async function processMessage(event, fbPageId) {
     // 4. Get AI Response
     console.log(`[DEBUG] Requesting AI completion from OpenRouter (${page.ai_model || 'default'})...`);
     // Decrypt keys
-    const openRouterKey = decryptSecret(page.openrouter_key) || process.env.OPENROUTER_API_KEY;
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
     const pageAccessToken = decryptSecret(page.access_token);
 
     if (!openRouterKey) {

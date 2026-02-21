@@ -694,8 +694,6 @@
         </div>
 
         <label>Page Access Token</label><input id="p-atok" class="input" type="password" placeholder="EAAb...">
-        <label>OpenRouter API Key (Optional per page)</label><input id="p-openrouter" class="input" type="password"
-          placeholder="sk-or-...">
 
         <div style="margin-top:12px">
           <h3>Active Knowledge Skills</h3>
@@ -1529,16 +1527,12 @@
       document.getElementById('p-vtok').placeholder = 'Your secret phrase';
       document.getElementById('p-atok').value = '';
       document.getElementById('p-atok').placeholder = 'EAAb...';
-      document.getElementById('p-openrouter').value = '';
       document.getElementById('p-vtok').readOnly = false;
       document.getElementById('p-atok').readOnly = false;
-      document.getElementById('p-openrouter').readOnly = false;
       document.getElementById('p-vtok').style.opacity = '1';
       document.getElementById('p-atok').style.opacity = '1';
-      document.getElementById('p-openrouter').style.opacity = '1';
       document.getElementById('p-vtok').style.cursor = 'text';
       document.getElementById('p-atok').style.cursor = 'text';
-      document.getElementById('p-openrouter').style.cursor = 'text';
 
       let selected = new Set();
 
@@ -1558,17 +1552,13 @@
           // Never prefill secret inputs with masked values; keep blank and show saved state in placeholder
           const vt = document.getElementById('p-vtok');
           const at = document.getElementById('p-atok');
-          const ork = document.getElementById('p-openrouter');
           vt.value = '';
           at.value = '';
-          ork.value = '';
           vt.placeholder = p.verify_token ? 'Locked (Saved)' : 'Your secret phrase';
           at.placeholder = p.access_token ? 'Locked (Saved)' : 'EAAb...';
-          ork.placeholder = p.openrouter_key ? 'Locked (Saved)' : 'sk-or-...';
 
           if (p.verify_token) { vt.readOnly = true; vt.style.opacity = '0.6'; vt.style.cursor = 'not-allowed'; }
           if (p.access_token) { at.readOnly = true; at.style.opacity = '0.6'; at.style.cursor = 'not-allowed'; }
-          if (p.openrouter_key) { ork.readOnly = true; ork.style.opacity = '0.6'; ork.style.cursor = 'not-allowed'; }
 
           selected = new Set(p.knowledge_base || []);
         }
@@ -1653,7 +1643,6 @@
       }
 
       const aTok = document.getElementById('p-atok').value;
-      const orTok = document.getElementById('p-openrouter').value;
       const kbSelected = Array.from(document.querySelectorAll('#kb-selector-list input:checked')).map(i => i.value);
       const prodSelected = Array.from(document.querySelectorAll('#product-selector-list input:checked')).map(i => i.value);
 
@@ -1665,7 +1654,6 @@
         fb_page_id: document.getElementById('p-id').value,
         verify_token: vTok || undefined, // If locked/blank, server logic ignores it
         access_token: aTok || undefined,
-        openrouter_key: orTok || undefined,
         ai_model: document.getElementById('p-model').value,
         knowledge_base: combinedSelections
       };
