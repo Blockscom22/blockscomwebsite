@@ -1189,7 +1189,7 @@
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
-            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">${window.location.origin}/webhook</code>
+            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">${window.location.origin}/webhook?page=${p.id}</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
@@ -1770,7 +1770,9 @@
 
     async function openPageModal(id = null) {
       document.getElementById('pageModalTitle').innerText = id ? 'Update Configuration' : 'New Webhook Setup';
-      document.getElementById('modal-webhook-link').innerText = window.location.origin + '/webhook';
+
+      const targetId = id || ('temp-' + Date.now());
+      document.getElementById('modal-webhook-link').innerText = window.location.origin + '/webhook?page=' + targetId;
       document.getElementById('p-id-hidden').value = id || '';
       document.getElementById('p-name').value = '';
       document.getElementById('p-widget-name').value = '';
