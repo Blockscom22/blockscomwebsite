@@ -242,6 +242,23 @@ app.delete('/api/knowledge/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// API: Orders (User-specific)
+app.get('/api/orders', requireAuth, async (req, res) => {
+  const query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+  if (req.user.profile.role !== 'ADMIN') query.eq('profile_id', req.user.id);
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
+  const { status } = req.body;
+  const { error } = await supabase.from('orders').update({ status }).eq('id', req.params.id).eq('profile_id', req.user.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // API: Import Skills from Local Files
 app.post('/api/kb/scan-files', requireAuth, async (req, res) => {
   try {
@@ -527,12 +544,75 @@ INSTRUCTIONS:
 - Answer directly based on the knowledge base and product catalog.
 - IMPORTANT: When listing products, format them using Markdown (e.g., bullet points and **bold** text) for better readability.
 - Add line breaks between distinct items so it does not look like a wall of text.
-- Be polite and professional.` },
+- Be polite and professional.
+- If a customer wants to place an order, ask for their name, contact info, and shipping address. Once provided, use the place_order tool.` },
         { role: 'user', content: String(message) }
-      ]
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "place_order",
+          description: "Places a new order for a customer.",
+          parameters: {
+            type: "object",
+            properties: {
+              customer_name: { type: "string" },
+              customer_contact: { type: "string", description: "Email or phone number" },
+              shipping_address: { type: "string" },
+              items: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    quantity: { type: "integer" },
+                    price: { type: "number" }
+                  },
+                  required: ["name", "quantity", "price"]
+                }
+              },
+              total_amount: { type: "number" }
+            },
+            required: ["customer_name", "customer_contact", "shipping_address", "items", "total_amount"]
+          }
+        }
+      }]
     }, { headers: { 'Authorization': `Bearer ${resolvedApiKey}` } });
 
-    const reply = aiRes.data?.choices?.[0]?.message?.content || 'Thanks! Can you share more details?';
+    let reply = aiRes.data?.choices?.[0]?.message?.content || '';
+    const toolCalls = aiRes.data?.choices?.[0]?.message?.tool_calls;
+
+    if (toolCalls && toolCalls.length > 0) {
+      for (const toolCall of toolCalls) {
+        if (toolCall.function.name === 'place_order') {
+          try {
+            const orderArgs = JSON.parse(toolCall.function.arguments);
+            const { error: insertError } = await supabase.from('orders').insert([{
+              profile_id: page.profile_id,
+              fb_page_id: page.id,
+              customer_name: orderArgs.customer_name,
+              customer_contact: orderArgs.customer_contact,
+              shipping_address: orderArgs.shipping_address,
+              items: orderArgs.items,
+              total_amount: orderArgs.total_amount,
+              status: 'PENDING'
+            }]);
+
+            if (insertError) {
+              console.error("Order Insert Error (Widget):", insertError);
+              reply = "Sorry, I encountered an error while placing your order. Please try again.";
+            } else {
+              reply = `I have successfully placed your order for ${orderArgs.items.map(i => i.quantity + 'x ' + i.name).join(', ')}. Your total is $${orderArgs.total_amount}. We will ship it to ${orderArgs.shipping_address}. Thank you, ${orderArgs.customer_name}!`;
+            }
+          } catch (e) {
+            console.error("Failed to parse tool call or insert order:", e);
+            reply = "Sorry, there was a problem processing your order details.";
+          }
+        }
+      }
+    } else if (!reply) {
+      reply = 'Thanks! Can you share more details?';
+    }
 
     await supabase.from('activity_logs').insert([{ fb_page_id: page.id, type: 'WIDGET_REPLY', payload: { in: message, out: reply } }]);
 
@@ -678,10 +758,40 @@ async function processMessage(event, fbPageId) {
             - IMPORTANT: When listing products, use clear formatting (bullet points, double newlines for spacing, and asterisks for basic bolding) to organize the text neatly.
             - Be polite and professional.
             - Keep answers concise for chat.
+            - If a customer wants to place an order, ask for their name, contact info, and shipping address. Once provided, use the place_order tool.
             `
           },
           { role: 'user', content: messageText }
-        ]
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "place_order",
+            description: "Places a new order for a customer.",
+            parameters: {
+              type: "object",
+              properties: {
+                customer_name: { type: "string" },
+                customer_contact: { type: "string", description: "Email or phone number" },
+                shipping_address: { type: "string" },
+                items: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      quantity: { type: "integer" },
+                      price: { type: "number" }
+                    },
+                    required: ["name", "quantity", "price"]
+                  }
+                },
+                total_amount: { type: "number" }
+              },
+              required: ["customer_name", "customer_contact", "shipping_address", "items", "total_amount"]
+            }
+          }
+        }]
       },
       {
         headers: {
@@ -693,7 +803,40 @@ async function processMessage(event, fbPageId) {
       }
     );
 
-    const replyText = aiRes.data.choices?.[0]?.message?.content || "I'm not sure how to respond to that.";
+    let replyText = aiRes.data.choices?.[0]?.message?.content || "";
+    const toolCalls = aiRes.data.choices?.[0]?.message?.tool_calls;
+
+    if (toolCalls && toolCalls.length > 0) {
+      for (const toolCall of toolCalls) {
+        if (toolCall.function.name === 'place_order') {
+          try {
+            const orderArgs = JSON.parse(toolCall.function.arguments);
+            const { error: insertError } = await supabase.from('orders').insert([{
+              profile_id: page.profile_id,
+              fb_page_id: page.id,
+              customer_name: orderArgs.customer_name,
+              customer_contact: orderArgs.customer_contact,
+              shipping_address: orderArgs.shipping_address,
+              items: orderArgs.items,
+              total_amount: orderArgs.total_amount,
+              status: 'PENDING'
+            }]);
+
+            if (insertError) {
+              console.error("Order Insert Error (Webhook):", insertError);
+              replyText = "Sorry, I encountered an error while placing your order. Please try again.";
+            } else {
+              replyText = `I have successfully placed your order for ${orderArgs.items.map(i => i.quantity + 'x ' + i.name).join(', ')}. Your total is $${orderArgs.total_amount}. We will ship it to ${orderArgs.shipping_address}. Thank you, ${orderArgs.customer_name}!`;
+            }
+          } catch (e) {
+            console.error("Failed to parse tool call or insert order:", e);
+            replyText = "Sorry, there was a problem processing your order details.";
+          }
+        }
+      }
+    } else if (!replyText) {
+      replyText = "I'm not sure how to respond to that.";
+    }
     console.log(`[DEBUG] AI Reply: ${replyText.substring(0, 50)}...`);
 
     // 5. Send Reply to Facebook
@@ -792,7 +935,7 @@ app.post('/webhook', async (req, res) => {
   const body = req.body;
 
   if (body.object === 'page') {
-    res.status(200).send('EVENT_RECEIVED'); // Immediate ack to Facebook
+    let promises = [];
 
     for (const entry of body.entry) {
       // Get the page ID from the entry
@@ -803,10 +946,20 @@ app.post('/webhook', async (req, res) => {
         for (const event of entry.messaging) {
           if (event.message && event.message.text) {
             // Process in background (async)
-            processMessage(event, fbPageId);
+            promises.push(processMessage(event, fbPageId));
           }
         }
       }
+    }
+
+    try {
+      // We MUST await all promises before sending the response on Vercel
+      // Otherwise the serverless function terminates immediately and kills the background tasks.
+      await Promise.all(promises);
+      res.status(200).send('EVENT_RECEIVED'); // Ack to Facebook AFTER processing
+    } catch (e) {
+      console.error("Error processing webhooks:", e);
+      res.status(500).send('ERROR');
     }
   } else {
     res.sendStatus(404);

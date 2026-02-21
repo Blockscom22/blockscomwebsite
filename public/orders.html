@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLOCKSCOM | Orders</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #09090b;
+            --surface: #121216;
+            --surface-elevated: #1c1c21;
+            --border: #27272a;
+            --primary: #ffffff;
+            --accent: #3f3f46;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text: #fafafa;
+            --text-muted: #a1a1aa;
+            --text-dim: #71717a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 280px;
+            border-right: 1px solid var(--border);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            background: var(--bg);
+            z-index: 50;
+            transition: transform 0.3s ease;
+        }
+
+        .main {
+            flex: 1;
+            margin-left: 280px;
+            padding: 48px;
+            max-width: 1300px;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 80px 24px 24px 24px;
+            }
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.25rem;
+            margin-bottom: 48px;
+            letter-spacing: -0.5px;
+            cursor: pointer;
+        }
+
+        .logo span {
+            color: var(--text-dim);
+            margin-left: 2px;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 24px;
+        }
+
+        .nav-group {
+            margin-bottom: 32px;
+        }
+
+        .nav-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            padding-left: 12px;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .nav-item:hover {
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        .nav-item.active {
+            background: var(--surface-elevated);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .user-card {
+            margin-top: auto;
+            padding: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+
+        .user-email {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-tier {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            background: var(--bg);
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-size: 0.75rem;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+
+        .btn-secondary {
+            background: var(--surface-elevated);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--accent);
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            background: var(--surface);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        th {
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+            vertical-align: top;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: var(--text-dim);
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+
+        .badge-pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .badge-processing {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .badge-shipped {
+            background: rgba(99, 102, 241, 0.1);
+            color: #6366f1;
+        }
+
+        .badge-delivered {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--success);
+        }
+
+        .badge-cancelled {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .select-status {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            outline: none;
+            margin-top: 8px;
+            width: 100%;
+        }
+
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            z-index: 40;
+            padding: 0 24px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .hamburger {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <div class="logo" onclick="window.location.href='/dashboard.html'">BLOCKSCOM<span>●</span></div>
+
+        <div class="nav-group">
+            <div class="nav-label">Main</div>
+            <a href="/dashboard.html" class="nav-item">Dashboard</a>
+            <a href="/dashboard.html" class="nav-item">Knowledge Base</a>
+            <a href="/dashboard.html" class="nav-item">Inventory System</a>
+            <a href="/dashboard.html" class="nav-item">Live Activity</a>
+            <a href="/orders.html" class="nav-item active">Orders</a>
+        </div>
+
+        <div class="user-card">
+            <div id="u-tier" class="user-tier">TIER: FREE</div>
+            <div id="u-email" class="user-email">...</div>
+            <button onclick="logout()" class="btn btn-secondary"
+                style="width:100%; margin-top:20px; font-size:0.75rem">Sign Out</button>
+        </div>
+    </div>
+
+    <div class="mobile-header">
+        <div class="logo" style="margin-bottom:0; font-size:1.1rem" onclick="window.location.href='/dashboard.html'">
+            BLOCKSCOM<span>●</span></div>
+        <button class="hamburger" onclick="toggleSidebar()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+
+    <main class="main">
+        <div class="header">
+            <h1>AI Customer Orders</h1>
+            <p style="color:var(--text-dim); font-size:0.9rem; margin-top:-16px; margin-bottom:32px;">Manage system
+                orders placed seamlessly by your AI assistant.</p>
+        </div>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Order Date</th>
+                        <th>Customer</th>
+                        <th>Shipping Details</th>
+                        <th>Items Ordered</th>
+                        <th>Total Amount</th>
+                        <th style="width:150px">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table-body">
+                    <tr>
+                        <td colspan="6" class="empty-state">Loading orders...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="/config-client.js"></script>
+    <script>
+        const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        let currentSession = null;
+
+        async function init() {
+            const { data } = await sb.auth.getSession();
+            if (!data.session) { window.location.href = '/login'; return; }
+            currentSession = data.session;
+
+            fetch('/api/me', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } })
+                .then(async res => {
+                    if (!res.ok) { logout(); return; }
+                    const me = await res.json();
+                    document.getElementById('u-email').innerText = me.email;
+                    document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
+
+                    loadOrders();
+                })
+                .catch(console.error);
+        }
+
+        async function loadOrders() {
+            try {
+                const res = await fetch('/api/orders', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+                const orders = await res.json();
+
+                const tbody = document.getElementById('orders-table-body');
+                if (orders.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><h3>No active orders yet</h3><p>Your AI assistant will magically put new orders here.</p></td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = orders.map(order => {
+                    const date = new Date(order.created_at).toLocaleString();
+                    const itemsHtml = (order.items || []).map(i => `<div>${i.quantity}x ${i.name} ($${i.price})</div>`).join('');
+                    const badgeClass = `badge-${(order.status || 'pending').toLowerCase()}`;
+
+                    return `
+            <tr>
+              <td><div style="color:var(--text-muted); font-size:0.8rem">${date}</div></td>
+              <td>
+                <div style="font-weight:600">${escapeHtml(order.customer_name)}</div>
+                <div style="color:var(--text-dim); font-size:0.8rem; margin-top:4px">${escapeHtml(order.customer_contact)}</div>
+              </td>
+              <td><div style="white-space:pre-wrap; max-width:250px">${escapeHtml(order.shipping_address)}</div></td>
+              <td>${itemsHtml}</td>
+              <td style="font-weight:700; color:var(--success)">$${order.total_amount}</td>
+              <td>
+                <div class="badge ${badgeClass}">${order.status}</div>
+                <select class="select-status" onchange="updateOrderStatus('${order.id}', this.value)">
+                  <option value="PENDING" ${order.status === 'PENDING' ? 'selected' : ''}>PENDING</option>
+                  <option value="PROCESSING" ${order.status === 'PROCESSING' ? 'selected' : ''}>PROCESSING</option>
+                  <option value="SHIPPED" ${order.status === 'SHIPPED' ? 'selected' : ''}>SHIPPED</option>
+                  <option value="DELIVERED" ${order.status === 'DELIVERED' ? 'selected' : ''}>DELIVERED</option>
+                  <option value="CANCELLED" ${order.status === 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
+                </select>
+              </td>
+            </tr>
+          `;
+                }).join('');
+            } catch (e) {
+                console.error("Failed to load orders", e);
+            }
+        }
+
+        async function updateOrderStatus(id, status) {
+            if (!confirm(`Update order status to ${status}?`)) {
+                loadOrders(); // Reset select visual state
+                return;
+            }
+            try {
+                const res = await fetch(`/api/orders/${id}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${currentSession.access_token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+                if (res.ok) {
+                    loadOrders();
+                } else {
+                    alert('Failed to update status.');
+                }
+            } catch (e) {
+                console.error('Error updating status', e);
+                alert('Error updating status.');
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        async function logout() { await sb.auth.signOut(); window.location.href = '/login'; }
+        function toggleSidebar() { document.querySelector('.sidebar').classList.toggle('open'); }
+
+        document.addEventListener('click', (e) => {
+            const sidebar = document.querySelector('.sidebar');
+            const hamburger = document.querySelector('.hamburger');
+            if (window.innerWidth <= 900 && sidebar.classList.contains('open') && !sidebar.contains(e.target) && !hamburger.contains(e.target)) {
+                sidebar.classList.remove('open');
+            }
+        });
+
+        init();
+    </script>
+</body>
+
+</html>
