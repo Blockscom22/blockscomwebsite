@@ -219,6 +219,15 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
+
+  // Auto-generate Default Skill if empty (and not an admin viewing all skills)
+  if (data.length === 0 && req.user.profile.role !== 'ADMIN') {
+    const defaultSkill = { profile_id: req.user.id, title: 'Default Skill', content: 'I am a helpful AI assistant. I should aim to be concise, friendly, and professional in my responses.' };
+    await supabase.from('knowledge_entries').insert([defaultSkill]);
+    const { data: newData } = await supabase.from('knowledge_entries').select('*').eq('profile_id', req.user.id);
+    return res.json(newData || []);
+  }
+
   res.json(data);
 });
 

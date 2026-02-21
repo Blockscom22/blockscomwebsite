@@ -810,6 +810,37 @@
     </div>
   </div>
 
+  <!-- Modal: Admin User -->
+  <div class="modal-overlay" id="adminUserModal">
+    <div class="modal">
+      <h2 style="margin-bottom:8px">System Role & Credits</h2>
+      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:32px">Modify privileges and balance for <span
+          id="admin-um-email" style="font-weight:bold; color:var(--text)"></span>.</p>
+      <form onsubmit="event.preventDefault(); saveAdminUser();">
+        <input type="hidden" id="admin-um-id">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px">
+          <div>
+            <label>System Role</label>
+            <select id="admin-um-role" class="input">
+              <option value="FREE">FREE</option>
+              <option value="PREMIUM">PREMIUM</option>
+              <option value="ENTERPRISE">ENTERPRISE</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+          </div>
+          <div>
+            <label>Credits Balance</label>
+            <input type="number" id="admin-um-credits" class="input" placeholder="0" required>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; margin-top:32px">
+          <button type="submit" class="btn btn-primary" style="flex:1">Save Changes</button>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('adminUserModal')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/config-client.js"></script>
   <script>
     const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
@@ -1194,7 +1225,7 @@
           <td><div style="font-weight:600">${escapeHtml(u.email)}</div><div style="font-size:0.7rem; color:var(--text-dim)">${u.id}</div></td>
           <td><span class="badge ${u.role === 'ADMIN' ? 'badge-premium' : 'badge-free'}">${u.role}</span></td>
           <td style="font-weight:700">${u.credits.toLocaleString()}</td>
-          <td><button class="btn btn-secondary" onclick="editUser('${u.id}', ${u.credits}, '${u.role}')">Manage</button></td>
+          <td><button class="btn btn-secondary" onclick="editUser('${escapeHtml(u.id)}', ${u.credits}, '${escapeHtml(u.role)}', '${escapeHtml(u.email).replace(/'/g, "\\'")}')">Manage</button></td>
         </tr>
       `).join('');
     }
@@ -1743,12 +1774,40 @@
       if (res.ok) { alert('PIN updated!'); document.getElementById('new-pin').value = ''; }
     }
 
-    async function editUser(id, credits, role) {
-      const newCredits = prompt('Set user credit balance:', credits);
-      const newRole = prompt('Set user role (FREE, PREMIUM, ENTERPRISE, ADMIN):', role);
-      if (newCredits === null || newRole === null) return;
-      await fetch('/api/admin/users/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify({ credits: parseInt(newCredits), role: newRole }) });
-      loadAdminUsers();
+    function editUser(id, credits, role, email) {
+      document.getElementById('admin-um-id').value = id;
+      document.getElementById('admin-um-email').innerText = email;
+      document.getElementById('admin-um-credits').value = credits;
+      document.getElementById('admin-um-role').value = role;
+      document.getElementById('adminUserModal').style.display = 'flex';
+    }
+
+    async function saveAdminUser() {
+      const id = document.getElementById('admin-um-id').value;
+      const credits = parseInt(document.getElementById('admin-um-credits').value);
+      const role = document.getElementById('admin-um-role').value;
+
+      const btn = document.querySelector('#adminUserModal button[type="submit"]');
+      const originalText = btn.innerText;
+      btn.innerText = 'Saving...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/admin/users/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+          body: JSON.stringify({ credits: credits, role: role })
+        });
+
+        if (!res.ok) throw new Error('Failed to update');
+        closeModal('adminUserModal');
+        loadAdminUsers();
+      } catch (e) {
+        alert('Failed to update user: ' + e.message);
+      } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      }
     }
 
     async function deletePage(id) {
