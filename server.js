@@ -174,11 +174,11 @@ app.put('/api/pages/theme', requireAuth, async (req, res) => {
 // API: Add/Update Page
 app.post('/api/pages', requireAuth, async (req, res) => {
   try {
-    const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base } = req.body;
+    const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base, widget_name } = req.body;
 
     if (id) {
       // Update
-      const updates = { name, fb_page_id, ai_model, knowledge_base };
+      const updates = { name, fb_page_id, ai_model, knowledge_base, widget_name };
       if (verify_token && !isMasked(verify_token)) updates.verify_token = encryptSecret(verify_token);
       if (access_token && !isMasked(access_token)) updates.access_token = encryptSecret(access_token);
 
@@ -194,6 +194,7 @@ app.post('/api/pages', requireAuth, async (req, res) => {
         access_token: encryptSecret(access_token),
         ai_model,
         knowledge_base: knowledge_base || [],
+        widget_name,
         widget_key: crypto.randomBytes(12).toString('hex')
       }]);
       if (error) throw error;
@@ -264,6 +265,12 @@ app.get('/api/orders', requireAuth, async (req, res) => {
 app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
   const { status } = req.body;
   const { error } = await supabase.from('orders').update({ status }).eq('id', req.params.id).eq('profile_id', req.user.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.delete('/api/orders/:id', requireAuth, async (req, res) => {
+  const { error } = await supabase.from('orders').delete().eq('id', req.params.id).eq('profile_id', req.user.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
@@ -527,13 +534,13 @@ app.get('/api/widget/config', async (req, res) => {
 
   const { data: page, error } = await supabase
     .from('fb_pages')
-    .select('id,name,ai_model,is_enabled,widget_key,allowed_domains,profile_id,widget_theme')
+    .select('id,name,ai_model,is_enabled,widget_key,allowed_domains,profile_id,widget_theme,widget_name')
     .eq('widget_key', key)
     .single();
 
   if (error || !page || !page.is_enabled) return res.status(404).json({ error: 'widget not found' });
 
-  res.json({ ok: true, pageName: page.name, model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'), theme: page.widget_theme || 'default' });
+  res.json({ ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'), theme: page.widget_theme || 'default' });
 });
 
 app.post('/api/widget/message', async (req, res) => {

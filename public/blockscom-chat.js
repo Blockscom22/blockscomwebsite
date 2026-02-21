@@ -199,7 +199,7 @@
   box.className = 'bc-chat-box';
   box.innerHTML = `
     <div class="bc-head">
-      <span>Blockscom Assistant</span>
+      <span id="bc-title">Blockscom Assistant</span>
       <span style="cursor:pointer;opacity:0.8" id="bc-close">✕</span>
     </div>
     <div class="bc-msgs" id="bc-msgs"></div>
@@ -218,6 +218,20 @@
   const input = box.querySelector('#bc-input');
   const send = box.querySelector('#bc-send');
   const close = box.querySelector('#bc-close');
+  const titleEl = box.querySelector('#bc-title');
+
+  async function initWidget() {
+    try {
+      const res = await fetch(`${apiBase}/api/widget/config?key=${encodeURIComponent(key)}`);
+      const data = await res.json();
+      if (data.ok) {
+        titleEl.textContent = data.widgetName || (data.pageName ? data.pageName + ' Assistant' : 'Blockscom Assistant');
+      }
+    } catch (e) {
+      console.error('[Blockscom Chat] Failed to load config', e);
+    }
+  }
+  initWidget();
 
   function push(role, text, products = []) {
     const row = document.createElement('div');

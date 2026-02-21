@@ -533,6 +533,9 @@
                   <option value="DELIVERED" ${order.status === 'DELIVERED' ? 'selected' : ''}>DELIVERED</option>
                   <option value="CANCELLED" ${order.status === 'CANCELLED' ? 'selected' : ''}>CANCELLED</option>
                 </select>
+                <div style="margin-top: 8px;">
+                  <button class="btn btn-logout" style="padding: 4px 8px; font-size: 0.7rem; color: var(--danger); border-color: rgba(239, 68, 68, 0.3);" onclick="deleteOrder('${order.id}')">Delete</button>
+                </div>
               </td>
             </tr>
           `;
@@ -564,6 +567,24 @@
             } catch (e) {
                 console.error('Error updating status', e);
                 alert('Error updating status.');
+            }
+        }
+
+        async function deleteOrder(id) {
+            if (!confirm(`Are you sure you want to delete this order?`)) return;
+            try {
+                const res = await fetch(`/api/orders/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+                });
+                if (res.ok) {
+                    loadOrders();
+                } else {
+                    alert('Failed to delete order.');
+                }
+            } catch (e) {
+                console.error('Error deleting order', e);
+                alert('Error deleting order.');
             }
         }
 
