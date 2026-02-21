@@ -150,6 +150,7 @@
             border: 2px dashed var(--border);
             border-radius: 12px;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             color: var(--text-dim);
@@ -220,14 +221,24 @@
                 <li>Log in to Facebook and switch to your Page profile.</li>
                 <li>Go to <strong>Settings & Privacy</strong> > <strong>Settings</strong>.</li>
                 <li>In the left sidebar, click on <strong>New Pages Experience</strong> (or simply
-                    <strong>About</strong> depending on your page version).</li>
+                    <strong>About</strong> depending on your page version).
+                </li>
                 <li>Click on <strong>Page Transparency</strong> or look at the bottom of the <strong>About</strong> tab
                     to find your <strong>Page ID</strong>.</li>
                 <li>Copy the numeric sequence (e.g., <code>123456789012345</code>) and paste it into the Dashboard.</li>
             </ol>
 
             <div class="image-placeholder">
-                [ Screenshot Placeholder: Show Facebook Page Settings indicating where to find the numeric Page ID ]
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <div style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 8px;">Screenshot: Facebook Page
+                    ID Location</div>
+                <div style="font-size: 0.85rem; color: var(--text-dim); max-width: 80%;">Replace this div with an
+                    &lt;img src="path/to/page-id-screenshot.png"&gt; tag later.</div>
             </div>
         </div>
 
@@ -244,14 +255,23 @@
                         Webhooks</strong>.</li>
                 <li>When prompted for a Callback URL, enter the Blockscom webhook URL (provided by support).</li>
                 <li>For the <strong>Verify Token</strong>, invent a secret phrase (e.g.,
-                    <code>blockscom_secure_2026</code>).</li>
+                    <code>blockscom_secure_2026</code>).
+                </li>
                 <li>Paste this exact same secret phrase into the <strong>Verify Token</strong> field in your Blockscom
                     Dashboard.</li>
             </ol>
 
             <div class="image-placeholder">
-                [ Screenshot Placeholder: Show the Meta Developer "Setup Webhooks" dialog highlighting the Verify Token
-                field ]
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <div style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 8px;">Screenshot: Webhook Setup &
+                    Verify Token Location</div>
+                <div style="font-size: 0.85rem; color: var(--text-dim); max-width: 80%;">Replace this div with an
+                    &lt;img src="path/to/verify-token-screenshot.png"&gt; tag later.</div>
             </div>
         </div>
 
@@ -276,8 +296,16 @@
             </ol>
 
             <div class="image-placeholder">
-                [ Screenshot Placeholder: Show the Meta Developer "Access Tokens" section with the 'Generate Token'
-                button clicked, highlighting the EAAb... token ]
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                    stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <div style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 8px;">Screenshot: Generate Access
+                    Token Location</div>
+                <div style="font-size: 0.85rem; color: var(--text-dim); max-width: 80%;">Replace this div with an
+                    &lt;img src="path/to/access-token-screenshot.png"&gt; tag later.</div>
             </div>
         </div>
 
