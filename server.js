@@ -125,6 +125,7 @@ async function requireAuth(req, res, next) {
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public/login.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public/dashboard.html')));
+app.get('/fb-setup-docs.html', (req, res) => res.sendFile(path.join(__dirname, 'public/fb-setup-docs.html')));
 
 // API: Get Current User
 app.get('/api/me', requireAuth, (req, res) => res.json(req.user.profile));
