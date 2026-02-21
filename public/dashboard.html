@@ -1099,6 +1099,19 @@
       try {
         const res = await fetch('/api/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
         pagesCache = await res.json();
+
+        // Fetch stats for FB Pages analytics
+        try {
+          const statsRes = await fetch('/api/logs/stats', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+          const statsData = await statsRes.json();
+          pagesCache = pagesCache.map(p => ({
+            ...p,
+            stats: statsData[p.id] || { userCount: 0, replyCount: 0 }
+          }));
+        } catch (se) {
+          console.error("Failed to load stats", se);
+        }
+
         pagesLoaded = true;
         renderPagesList();
       } catch (e) {
@@ -1121,6 +1134,16 @@
           <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px">
             <div><div style="font-weight:700; font-size:1.1rem">${escapeHtml(p.name)}</div><div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">ID: ${escapeHtml(p.fb_page_id)}</div></div>
             <div class="badge ${p.is_enabled ? 'badge-premium' : 'badge-free'}">${p.is_enabled ? 'Active' : 'Disabled'}</div>
+          </div>
+          <div style="display:flex; gap:12px; margin-bottom:16px;">
+            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; flex:1; text-align:center;">
+              <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Users</div>
+              <div style="font-size:1.2rem; font-weight:700; color:var(--text);">${p.stats ? p.stats.userCount : 0}</div>
+            </div>
+            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; flex:1; text-align:center;">
+              <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Bot Replies</div>
+              <div style="font-size:1.2rem; font-weight:700; color:var(--primary);">${p.stats ? p.stats.replyCount : 0}</div>
+            </div>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
@@ -1269,6 +1292,12 @@
         if (!res.ok || result.error) {
           alert('Analysis Failed: ' + (result.error || 'Unknown error'));
           return;
+        }
+
+        if (me && me.role !== 'ADMIN') {
+          me.credits = Math.max(0, (me.credits || 0) - 2);
+          document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
+          localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
         }
 
         // Convert the markdown report to HTML

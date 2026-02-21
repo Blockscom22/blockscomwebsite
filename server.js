@@ -404,6 +404,45 @@ app.get('/api/logs', requireAuth, async (req, res) => {
   res.json(filtered);
 });
 
+// API: Logs Stats
+app.get('/api/logs/stats', requireAuth, async (req, res) => {
+  try {
+    const { data: pages } = await supabase.from('fb_pages').select('id').eq('profile_id', req.user.id);
+    if (!pages || pages.length === 0) return res.json({});
+
+    const pageIds = pages.map(p => p.id);
+    const { data: logs, error } = await supabase.from('activity_logs')
+      .select('fb_page_id, type, payload')
+      .in('fb_page_id', pageIds);
+
+    if (error) throw error;
+
+    const stats = {};
+    pageIds.forEach(id => {
+      stats[id] = { users: new Set(), replies: 0 };
+    });
+
+    (logs || []).forEach(log => {
+      if (stats[log.fb_page_id]) {
+        if (log.payload && log.payload.sender) stats[log.fb_page_id].users.add(log.payload.sender);
+        if (log.type === 'AUTO_REPLY' || log.type === 'WIDGET_REPLY') stats[log.fb_page_id].replies++;
+      }
+    });
+
+    const finalStats = {};
+    Object.keys(stats).forEach(id => {
+      finalStats[id] = {
+        userCount: stats[id].users.size,
+        replyCount: stats[id].replies
+      };
+    });
+
+    res.json(finalStats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // API: Analyze Logs
 app.post('/api/logs/analyze', requireAuth, async (req, res) => {
   try {
@@ -448,6 +487,7 @@ Include:
 2. Customer sentiment analysis.
 3. Common questions or issues raised.
 4. An assessment of bot performance (quality of answers).
+5. Provide actionable tips or practical sample changes for the "prompt.MD" to improve sales and marketing.
 Please format nicely with headers and bullet points.`
         },
         { role: 'user', content: logText.substring(0, 50000) }
@@ -503,11 +543,21 @@ app.post('/api/widget/message', async (req, res) => {
 
     const { data: page, error } = await supabase
       .from('fb_pages')
-      .select('*')
+      .select('*, profiles:profile_id (*)')
       .eq('widget_key', String(key))
       .single();
 
     if (error || !page || !page.is_enabled) return res.status(404).json({ error: 'widget not found' });
+
+    const userProfile = page.profiles;
+    if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) <= 0) {
+      return res.status(402).json({ error: 'out of credits' });
+    }
+
+    const canReply = await checkDailyLimit(page.profile_id, userProfile?.role || 'FREE');
+    if (!canReply) {
+      return res.status(429).json({ error: 'daily reply limit reached for your tier' });
+    }
 
     // Optional domain allowlist check
     const origin = String(req.headers.origin || '');
@@ -633,6 +683,32 @@ INSTRUCTIONS:
 
 // ==================== WEBHOOK LOGIC ====================
 
+// Helper to check daily limit
+async function checkDailyLimit(profileId, role) {
+  if (role === 'ENTERPRISE' || role === 'ADMIN') return true;
+  const limit = role === 'PREMIUM' ? 2500 : 200;
+
+  const { data: pages } = await supabase.from('fb_pages').select('id').eq('profile_id', profileId);
+  if (!pages || pages.length === 0) return true;
+  const pageIds = pages.map(p => p.id);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const { count, error } = await supabase
+    .from('activity_logs')
+    .select('*', { count: 'exact', head: true })
+    .in('type', ['AUTO_REPLY', 'WIDGET_REPLY'])
+    .gte('created_at', today.toISOString())
+    .in('fb_page_id', pageIds);
+
+  if (error) {
+    console.error("Daily limit check error", error);
+    return true; // fail open
+  }
+  return count < limit;
+}
+
 // Helper to process a single message event
 async function processMessage(event, fbPageId) {
   console.log('--- START PROCESS MESSAGE ---');
@@ -670,6 +746,12 @@ async function processMessage(event, fbPageId) {
 
     if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) <= 0) {
       console.log(`[DEBUG] User ${userProfile.email} out of credits.`);
+      return;
+    }
+
+    const canReply = await checkDailyLimit(page.profile_id, userProfile?.role || 'FREE');
+    if (!canReply) {
+      console.log(`[DEBUG] User ${userProfile?.email} reached their daily limit.`);
       return;
     }
 
