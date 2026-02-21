@@ -879,11 +879,27 @@
       await loadKb();
     }
 
-    function updateSnippetTheme(pageId, widgetKey, theme) {
+    async function updateSnippetTheme(pageId, widgetKey, theme) {
       const codeEl = document.getElementById('snippet-code-' + pageId);
       if (codeEl) {
         // Appending ?v=Date.now() ensures that users get the latest script without browser caching issues
         codeEl.innerText = `<script src="${window.location.origin}/blockscom-chat.js?v=${Date.now()}" data-key="${widgetKey}" data-theme="${theme}" data-api="${window.location.origin}"></scr` + `ipt>`;
+      }
+      try {
+        await fetch('/api/pages/theme', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ id: pageId, theme: theme })
+        });
+
+        // Update the cache so re-renders don't lose the selection
+        const idx = pagesCache.findIndex(pg => pg.id === pageId);
+        if (idx !== -1) pagesCache[idx].widget_theme = theme;
+      } catch (e) {
+        console.error("Failed to save theme", e);
       }
     }
 
@@ -966,14 +982,14 @@
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
               <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Website Plugin Snippet</div>
               <select class="input" style="width:auto; margin:0; padding:4px 8px; font-size:0.75rem" onchange="updateSnippetTheme('${p.id}', '${p.widget_key || ''}', this.value)">
-                <option value="default">Default Theme</option>
-                <option value="white">White Theme</option>
-                <option value="black">Black Theme</option>
-                <option value="glass">Glassmorphism (Futuristic)</option>
-                <option value="cyberpunk">Cyberpunk (Aesthetic)</option>
+                <option value="default" ${p.widget_theme === 'default' || !p.widget_theme ? 'selected' : ''}>Default Theme</option>
+                <option value="white" ${p.widget_theme === 'white' ? 'selected' : ''}>White Theme</option>
+                <option value="black" ${p.widget_theme === 'black' ? 'selected' : ''}>Black Theme</option>
+                <option value="glass" ${p.widget_theme === 'glass' ? 'selected' : ''}>Glassmorphism (Futuristic)</option>
+                <option value="cyberpunk" ${p.widget_theme === 'cyberpunk' ? 'selected' : ''}>Cyberpunk (Aesthetic)</option>
               </select>
             </div>
-            <code id="snippet-code-${p.id}" style="font-size:0.75rem; color:var(--text-muted); word-break:break-all">&lt;script src="${window.location.origin}/blockscom-chat.js?v=${Date.now()}" data-key="${p.widget_key || ''}" data-theme="default" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
+            <code id="snippet-code-${p.id}" style="font-size:0.75rem; color:var(--text-muted); word-break:break-all">&lt;script src="${window.location.origin}/blockscom-chat.js?v=${Date.now()}" data-key="${p.widget_key || ''}" data-theme="${p.widget_theme || 'default'}" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base || []).filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).length})</div>

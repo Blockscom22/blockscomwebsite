@@ -8,25 +8,112 @@
     return;
   }
 
+  const theme = script?.getAttribute('data-theme') || 'default';
+
+  const themes = {
+    default: {
+      primaryGradient: 'linear-gradient(135deg, #6e8efb, #a777e3)',
+      primaryColor: '#6e8efb',
+      primaryBtnHover: '#a777e3',
+      btnText: '#fff',
+      boxBg: 'rgba(255, 255, 255, 0.95)',
+      boxBorder: 'rgba(255, 255, 255, 0.3)',
+      msgsBg: '#f8f9fa',
+      userBg: '#6e8efb',
+      userText: '#fff',
+      botBg: '#fff',
+      botText: '#333',
+      inputBg: '#fff',
+      inputBorder: '#eee',
+      inputText: '#333'
+    },
+    white: {
+      primaryGradient: '#000',
+      primaryColor: '#000',
+      primaryBtnHover: '#333',
+      btnText: '#fff',
+      boxBg: '#fff',
+      boxBorder: '#eee',
+      msgsBg: '#f9f9f9',
+      userBg: '#000',
+      userText: '#fff',
+      botBg: '#fff',
+      botText: '#000',
+      inputBg: '#fff',
+      inputBorder: '#ddd',
+      inputText: '#000'
+    },
+    black: {
+      primaryGradient: '#222',
+      primaryColor: '#444',
+      primaryBtnHover: '#555',
+      btnText: '#fff',
+      boxBg: '#1a1a1a',
+      boxBorder: '#333',
+      msgsBg: '#0f0f0f',
+      userBg: '#444',
+      userText: '#fff',
+      botBg: '#222',
+      botText: '#fff',
+      inputBg: '#1a1a1a',
+      inputBorder: '#333',
+      inputText: '#fff'
+    },
+    glass: {
+      primaryGradient: 'rgba(255,255,255,0.2)',
+      primaryColor: 'rgba(255,255,255,0.3)',
+      primaryBtnHover: 'rgba(255,255,255,0.4)',
+      btnText: '#fff',
+      boxBg: 'rgba(0, 0, 0, 0.4)',
+      boxBorder: 'rgba(255, 255, 255, 0.2)',
+      msgsBg: 'transparent',
+      userBg: 'rgba(255,255,255,0.2)',
+      userText: '#fff',
+      botBg: 'rgba(255,255,255,0.1)',
+      botText: '#fff',
+      inputBg: 'transparent',
+      inputBorder: 'rgba(255,255,255,0.2)',
+      inputText: '#fff'
+    },
+    cyberpunk: {
+      primaryGradient: '#fce205',
+      primaryColor: '#fce205',
+      primaryBtnHover: '#ffeb3b',
+      btnText: '#000',
+      boxBg: '#000',
+      boxBorder: '#00ffcc',
+      msgsBg: '#111',
+      userBg: '#ff003c',
+      userText: '#fff',
+      botBg: '#000',
+      botText: '#00ffcc',
+      inputBg: '#000',
+      inputBorder: '#fce205',
+      inputText: '#fce205'
+    }
+  };
+
+  const t = themes[theme] || themes.default;
+
   const style = document.createElement('style');
   style.innerHTML = `
   @keyframes bc-fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .bc-chat-btn {
     position: fixed; right: 20px; bottom: 20px; z-index: 99999;
     width: 60px; height: 60px;
-    background: linear-gradient(135deg, #6e8efb, #a777e3);
-    color: #fff; border-radius: 50%;
+    background: ${t.primaryGradient};
+    color: ${t.btnText}; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; box-shadow: 0 10px 25px rgba(110, 142, 251, 0.4);
+    cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0, 0.2);
     transition: all 0.3s ease;
   }
-  .bc-chat-btn:hover { transform: scale(1.1) rotate(5deg); box-shadow: 0 15px 30px rgba(110, 142, 251, 0.5); }
+  .bc-chat-btn:hover { transform: scale(1.1) rotate(5deg); box-shadow: 0 15px 30px rgba(0,0,0, 0.3); }
   .bc-chat-box {
     position: fixed; right: 20px; bottom: 90px; z-index: 99999;
     width: 350px; height: 500px;
-    background: rgba(255, 255, 255, 0.95);
+    background: ${t.boxBg};
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid ${t.boxBorder};
     border-radius: 24px;
     display: none; flex-direction: column;
     overflow: hidden; font-family: 'Inter', -apple-system, sans-serif;
@@ -34,14 +121,14 @@
     animation: bc-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .bc-head {
-    background: linear-gradient(135deg, #6e8efb, #a777e3);
-    color: #fff; padding: 20px;
+    background: ${t.primaryGradient};
+    color: ${t.btnText}; padding: 20px;
     font-weight: 700; font-size: 16px;
     display: flex; align-items: center; justify-content: space-between;
   }
   .bc-msgs {
     flex: 1; padding: 20px; overflow: auto;
-    background: #f8f9fa; display: flex; flex-direction: column; gap: 12px;
+    background: ${t.msgsBg}; display: flex; flex-direction: column; gap: 12px;
   }
   .bc-row {
     max-width: 80%; padding: 10px 14px;
@@ -50,12 +137,12 @@
   }
   .bc-user {
     align-self: flex-end;
-    background: #6e8efb; color: #fff;
+    background: ${t.userBg}; color: ${t.userText};
     border-bottom-right-radius: 4px;
   }
   .bc-bot {
     align-self: flex-start;
-    background: #fff; color: #333;
+    background: ${t.botBg}; color: ${t.botText};
     border-bottom-left-radius: 4px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
   }
@@ -68,38 +155,39 @@
   .bc-slider::-webkit-scrollbar { height: 6px; }
   .bc-slider::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
   .bc-card {
-    min-width: 160px; max-width: 160px; background: #fff;
+    min-width: 160px; max-width: 160px; background: ${t.botBg}; color: ${t.botText};
     border-radius: 12px; overflow: hidden;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     scroll-snap-align: start; flex-shrink: 0;
     font-size: 13px; text-align: left;
-    border: 1px solid #eee; transition: transform 0.2s;
+    border: 1px solid ${t.inputBorder}; transition: transform 0.2s;
   }
-  .bc-card:hover { transform: translateY(-2px); border-color: #6e8efb; }
+  .bc-card:hover { transform: translateY(-2px); border-color: ${t.primaryColor}; }
   .bc-card img {
     width: 100%; height: 120px; object-fit: cover;
-    background: #f0f0f0; border-bottom: 1px solid #eee;
+    background: #f0f0f0; border-bottom: 1px solid ${t.inputBorder};
   }
   .bc-card-body { padding: 12px; }
   .bc-card-title { font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bc-card-price { color: #6e8efb; font-weight: 800; }
+  .bc-card-price { color: ${t.primaryColor}; font-weight: 800; }
   .bc-input {
-    display: flex; padding: 15px; background: #fff;
-    border-top: 1px solid #eee; align-items: center; gap: 10px;
+    display: flex; padding: 15px; background: ${t.inputBg};
+    border-top: 1px solid ${t.inputBorder}; align-items: center; gap: 10px;
   }
   .bc-input input {
-    flex: 1; border: 1px solid #eee; padding: 12px 15px;
+    flex: 1; border: 1px solid ${t.inputBorder}; padding: 12px 15px;
     border-radius: 99px; outline: none; font-size: 14px;
+    background: transparent; color: ${t.inputText};
     transition: border-color 0.2s;
   }
-  .bc-input input:focus { border-color: #6e8efb; }
+  .bc-input input:focus { border-color: ${t.primaryColor}; }
   .bc-input button {
-    border: 0; background: #6e8efb; color: #fff;
+    border: 0; background: ${t.primaryColor}; color: ${t.btnText};
     width: 40px; height: 40px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: background 0.2s;
   }
-  .bc-input button:hover { background: #a777e3; }
+  .bc-input button:hover { background: ${t.primaryBtnHover}; }
   `;
   document.head.appendChild(style);
 
