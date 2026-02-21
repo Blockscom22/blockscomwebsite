@@ -1120,6 +1120,13 @@
           document.getElementById('price-th').innerHTML = `<label style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price"> Price (${displayCurrency})</label>`;
 
           syncProductsToKb();
+
+          // Listen for inventory changes to make it instantly live
+          sb.channel('public:products')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `profile_id=eq.${me.id}` }, payload => {
+              loadProducts();
+            })
+            .subscribe();
         })
         .catch(console.error);
     }
@@ -1922,6 +1929,7 @@
       } else {
         pagesCache.unshift({ ...body, id: 'temp-' + Date.now(), is_enabled: true, widget_key: 'Generating...' });
       }
+      pagesLoaded = false;
       renderPagesList();
 
       fetch('/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) })
@@ -1983,6 +1991,7 @@
       } else {
         kbOptions.unshift({ ...body, id: 'temp-' + Date.now() });
       }
+      kbLoaded = false;
       renderKbListBase();
 
       try {
