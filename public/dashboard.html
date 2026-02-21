@@ -1189,7 +1189,7 @@
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
-            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">${window.location.origin}/webhook?page=${p.id}</code>
+            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">https://www.blockscom.xyz/webhook?page=${p.id}</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
@@ -1772,7 +1772,7 @@
       document.getElementById('pageModalTitle').innerText = id ? 'Update Configuration' : 'New Webhook Setup';
 
       const targetId = id || ('temp-' + Date.now());
-      document.getElementById('modal-webhook-link').innerText = window.location.origin + '/webhook?page=' + targetId;
+      document.getElementById('modal-webhook-link').innerText = 'https://www.blockscom.xyz/webhook?page=' + targetId;
       document.getElementById('p-id-hidden').value = id || '';
       document.getElementById('p-name').value = '';
       document.getElementById('p-widget-name').value = '';
@@ -1809,8 +1809,8 @@
           const at = document.getElementById('p-atok');
           vt.value = '';
           at.value = '';
-          vt.placeholder = p.verify_token ? 'Locked (Saved)' : 'Your secret phrase';
-          at.placeholder = p.access_token ? 'Locked (Saved)' : 'EAAb...';
+          vt.placeholder = p.verify_token ? 'Locked (Saved - Do not edit unless changing)' : 'Your secret phrase';
+          at.placeholder = p.access_token ? 'Locked (Saved - Do not edit unless changing)' : 'EAAb...';
 
           if (p.verify_token) { vt.readOnly = true; vt.style.opacity = '0.6'; vt.style.cursor = 'not-allowed'; }
           if (p.access_token) { at.readOnly = true; at.style.opacity = '0.6'; at.style.cursor = 'not-allowed'; }
