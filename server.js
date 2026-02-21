@@ -134,6 +134,14 @@ app.put('/api/me/pin', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// API: Update User Currency
+app.put('/api/me/currency', requireAuth, async (req, res) => {
+  const { currency } = req.body;
+  const { error } = await supabase.from('profiles').update({ currency: currency }).eq('id', req.user.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // API: Get My Pages
 app.get('/api/pages', requireAuth, async (req, res) => {
   const query = supabase.from('fb_pages').select('*').order('created_at', { ascending: false });
@@ -427,6 +435,10 @@ Please format nicely with headers and bullet points.`
     res.json({ success: true, report });
   } catch (e) {
     console.error('Analyze Logs Error:', e.message);
+    if (e.response && e.response.data) {
+      console.error('OpenRouter Error Details:', e.response.data);
+      return res.status(500).json({ error: 'AI Error: ' + (e.response.data.error?.message || e.message) });
+    }
     res.status(500).json({ error: 'Failed to analyze logs.' });
   }
 });
@@ -701,10 +713,37 @@ async function processMessage(event, fbPageId) {
 
   } catch (err) {
     console.error('Error processing message:', err.message);
+    let errorDetail = err.message;
     if (err.response) {
       console.error('API Response data:', err.response.data);
+      errorDetail = JSON.stringify(err.response.data?.error || err.response.data);
     }
-    // Attempt to log error if possible
+
+    // Log error to DB so user can see it
+    if (targetPageId) {
+      const { data: errPage } = await supabase.from('fb_pages').select('id, access_token').eq('fb_page_id', targetPageId).single();
+      if (errPage) {
+        await supabase.from('activity_logs').insert([{
+          fb_page_id: errPage.id,
+          type: 'ERROR',
+          payload: { in: messageText, out: 'Failed to reply: ' + errorDetail.substring(0, 200), sender: senderId }
+        }]);
+
+        // Try to send a fallback message so it's not completely dead
+        try {
+          const token = decryptSecret(errPage.access_token);
+          if (token) {
+            await axios.post(
+              `https://graph.facebook.com/v22.0/me/messages`,
+              { recipient: { id: senderId }, message: { text: "Sorry, I am having trouble processing that right now. Please try again later." } },
+              { params: { access_token: token } }
+            );
+          }
+        } catch (fbErr) {
+          console.error("Failed to send fallback message:", fbErr.message);
+        }
+      }
+    }
   }
 }
 
