@@ -274,7 +274,7 @@
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
       gap: 24px;
     }
 
@@ -394,11 +394,37 @@
 
     @media (max-width: 600px) {
       .modal {
-        padding: 24px;
+        padding: 20px;
       }
 
       .grid {
         grid-template-columns: 1fr;
+      }
+
+      .card {
+        padding: 20px;
+        border-radius: 16px;
+      }
+    }
+
+    /* Mobile automation card fixes */
+    @media (max-width: 480px) {
+      .main {
+        padding: 72px 12px 16px 12px;
+      }
+
+      h1 {
+        font-size: 1.4rem;
+      }
+
+      .card {
+        padding: 16px;
+        border-radius: 14px;
+        margin-bottom: 16px;
+      }
+
+      .grid {
+        gap: 16px;
       }
     }
 
@@ -530,6 +556,12 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .mobile-header {
+        padding: 0 12px;
       }
     }
 
@@ -1475,40 +1507,40 @@
       }
       list.innerHTML = pagesCache.map(p => `
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px">
-            <div><div style="font-weight:700; font-size:1.1rem">${escapeHtml(p.name)}</div><div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">ID: ${escapeHtml(p.fb_page_id)}</div></div>
-            <div class="badge ${p.is_enabled ? 'badge-premium' : 'badge-free'}">${p.is_enabled ? 'Active' : 'Disabled'}</div>
+          <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px; gap:8px">
+            <div style="min-width:0"><div style="font-weight:700; font-size:1.1rem; word-break:break-word">${escapeHtml(p.name)}</div><div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px; word-break:break-all">ID: ${escapeHtml(p.fb_page_id)}</div></div>
+            <div class="badge ${p.is_enabled ? 'badge-premium' : 'badge-free'}" style="flex-shrink:0">${p.is_enabled ? 'Active' : 'Disabled'}</div>
           </div>
-          <div style="display:flex; gap:12px; margin-bottom:16px;">
-            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; flex:1; text-align:center;">
-              <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Users</div>
-              <div style="font-size:1.2rem; font-weight:700; color:var(--text);">${p.stats ? p.stats.userCount : 0}</div>
+          <div style="display:flex; gap:10px; margin-bottom:16px;">
+            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 8px; flex:1; text-align:center;">
+              <div style="font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Users</div>
+              <div style="font-size:1.1rem; font-weight:700; color:var(--text);">${p.stats ? p.stats.userCount : 0}</div>
             </div>
-            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; flex:1; text-align:center;">
-              <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Bot Replies</div>
-              <div style="font-size:1.2rem; font-weight:700; color:var(--primary);">${p.stats ? p.stats.replyCount : 0}</div>
+            <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 8px; flex:1; text-align:center;">
+              <div style="font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">Bot Replies</div>
+              <div style="font-size:1.1rem; font-weight:700; color:var(--primary);">${p.stats ? p.stats.replyCount : 0}</div>
             </div>
           </div>
-          <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
-              <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase">Webhook Endpoint</div>
-              <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; display:inline-flex; align-items:center; gap:4px;" onclick="copyText('${window.location.origin}/webhook?page=${p.id}', this)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px">
+              <div style="font-size:0.65rem; font-weight:700; color:var(--text-dim); text-transform:uppercase">Webhook Endpoint</div>
+              <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.65rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0" onclick="copyText('${window.location.origin}/webhook?page=${p.id}', this)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 Copy
               </button>
             </div>
-            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">${window.location.origin}/webhook?page=${p.id}</code>
+            <code style="font-size:0.75rem; color:var(--text-muted); word-break:break-all; display:block; line-height:1.4">${window.location.origin}/webhook?page=${p.id}</code>
           </div>
-          <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
-              <div style="display:flex; align-items:center; gap:8px">
-                <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Website Plugin Snippet</div>
-                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; display:inline-flex; align-items:center; gap:4px;" onclick="copyText(document.getElementById('snippet-code-${p.id}').innerText, this)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; margin-bottom:8px; gap:6px">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+                <div style="font-size:0.65rem; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Website Plugin Snippet</div>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.65rem; display:inline-flex; align-items:center; gap:4px; flex-shrink:0" onclick="copyText(document.getElementById('snippet-code-${p.id}').innerText, this)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                   Copy
                 </button>
               </div>
-              <select class="input" style="width:auto; margin:0; padding:4px 8px; font-size:0.75rem" onchange="updateSnippetTheme('${p.id}', '${p.widget_key || ''}', this.value)">
+              <select class="input" style="width:auto; min-width:0; margin:0; padding:4px 8px; font-size:0.7rem; max-width:100%" onchange="updateSnippetTheme('${p.id}', '${p.widget_key || ''}', this.value)">
                 <option value="default" ${p.widget_theme === 'default' || !p.widget_theme ? 'selected' : ''}>Default Theme</option>
                 <option value="white" ${p.widget_theme === 'white' ? 'selected' : ''}>White Theme</option>
                 <option value="black" ${p.widget_theme === 'black' ? 'selected' : ''}>Black Theme</option>
@@ -1516,10 +1548,10 @@
                 <option value="cyberpunk" ${p.widget_theme === 'cyberpunk' ? 'selected' : ''}>Cyberpunk (Aesthetic)</option>
               </select>
             </div>
-            <code id="snippet-code-${p.id}" style="font-size:0.75rem; color:var(--text-muted); word-break:break-all">&lt;script src="${window.location.origin}/blockscom-chat.js?v=${Date.now()}" data-key="${p.widget_key || ''}" data-theme="${p.widget_theme || 'default'}" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
+            <code id="snippet-code-${p.id}" style="font-size:0.7rem; color:var(--text-muted); word-break:break-all; display:block; line-height:1.4">&lt;script src="${window.location.origin}/blockscom-chat.js?v=${Date.now()}" data-key="${p.widget_key || ''}" data-theme="${p.widget_theme || 'default'}" data-api="${window.location.origin}"&gt;&lt;/script&gt;</code>
           </div>
-          <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px">
-            <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base || []).filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).length})</div>
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:16px">
+            <div style="font-size:0.65rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base || []).filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).length})</div>
             <div style="font-size:0.8rem; color:var(--text-muted)">${(p.knowledge_base && p.knowledge_base.length) ? p.knowledge_base.filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).slice(0, 3).join(', ') + (p.knowledge_base.length > 3 ? ' ...' : '') : 'No skills linked yet'}</div>
           </div>
           <div style="display:flex; gap:10px">
@@ -1542,31 +1574,32 @@
     function renderKbListBase() {
       const list = document.getElementById('kb-list');
       if (!kbLoaded) {
-        list.innerHTML = '<div class="empty-state"><h3>Loading Knowledge Base Skills...</h3></div>';
+        list.innerHTML = '<div class="empty-state"><h3>Loading Knowledge Base Skills...</h3><p style="opacity:0.6; margin-top:8px">Fetching your skills...</p></div>';
         return;
       }
-      if (kbOptions.length === 0) {
+      // Filter out PERSONALITY — it's always active and managed from the Automations page
+      const visibleKb = kbOptions.filter(k => k.title !== 'PERSONALITY');
+      if (visibleKb.length === 0) {
         list.innerHTML = '<div class="empty-state"><h3>Your Knowledge is Empty</h3><p>Add skills to help the AI understand your business.</p></div>';
         return;
       }
-      list.innerHTML = kbOptions.map(k => {
-        const isPersonality = k.title === 'PERSONALITY';
+      list.innerHTML = visibleKb.map(k => {
         const isSynced = k.title === 'Product Catalog';
         return `
-        <div class="card" ${isPersonality ? 'style="border-color:rgba(168,85,247,0.3); background:linear-gradient(145deg, var(--surface), rgba(168,85,247,0.04))"' : ''}>
+        <div class="card">
           <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:16px">
-             <div style="font-weight:700; font-size:1rem">${isPersonality ? '🧠 ' : ''}${escapeHtml(k.title)}</div>
+             <div style="font-weight:700; font-size:1rem">${escapeHtml(k.title)}</div>
              <div style="display:flex; gap:8px; align-items:center;">
                ${isSynced ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.70rem;" onclick="forceSyncProducts()">⟳ Sync</button>` : ''}
-               ${isPersonality ? '<div class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; font-size:0.65rem">🔒 Always Active</div>' : `<div class="badge badge-free">Skill Entry ${isSynced ? '(Synced)' : ''}</div>`}
+               <div class="badge badge-free">Skill Entry ${isSynced ? '(Synced)' : ''}</div>
              </div>
           </div>
           <div style="font-size:0.85rem; color:var(--text-dim); height:60px; overflow:hidden; mask-image:linear-gradient(to bottom, black 50%, transparent 100%)">${escapeHtml(k.content)}</div>
           <div style="display:flex; gap:10px; margin-top:20px; position:relative">
-            <button class="btn btn-secondary" style="flex:1" onclick="openKbModal('${k.id}')">${isPersonality ? '✏️ Edit Personality' : 'Edit Skill'}</button>
-            ${isPersonality ? '' : `<button class="btn btn-secondary" onclick="toggleAddToPage('${k.id}', '${escapeHtml(k.title).replace(/'/g, "\\'")}')">Add to Page</button>
+            <button class="btn btn-secondary" style="flex:1" onclick="openKbModal('${k.id}')">Edit Skill</button>
+            <button class="btn btn-secondary" onclick="toggleAddToPage('${k.id}', '${escapeHtml(k.title).replace(/'/g, "\\'")}')">Add to Page</button>
             <div class="atp-popup" id="atp-popup-${k.id}"></div>
-            <button class="btn btn-danger" onclick="deleteKb('${k.id}')">Del</button>`}
+            <button class="btn btn-danger" onclick="deleteKb('${k.id}')">Del</button>
           </div>
         </div>
       `;
@@ -1644,6 +1677,7 @@
     }
 
     async function loadLogs() {
+      document.getElementById('logs-table').innerHTML = '<tr><td colspan="4" class="empty-state">Loading activity...</td></tr>';
       const res = await fetch('/api/logs', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
       const logs = await res.json();
       document.getElementById('logs-table').innerHTML = logs.map(l => `
@@ -1799,6 +1833,7 @@
     let currentInvTableData = null;
 
     async function loadInvTables() {
+      document.getElementById('inv-tables-list').innerHTML = '<div class="empty-state"><h3>Loading Spreadsheets...</h3><p style="opacity:0.6; margin-top:8px">Fetching your inventory data...</p></div>';
       try {
         const res = await fetch('/api/inventory/tables', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
         invTablesCache = await res.json();
@@ -2174,6 +2209,12 @@
 
     async function openPageModal(id = null) {
       document.getElementById('pageModalTitle').innerText = id ? 'Update Configuration' : 'New Automation Setup';
+
+      // Preload KB data if not yet loaded so skill list is never empty
+      if (!kbLoaded) {
+        document.getElementById('kb-selector-list').innerHTML = '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">Loading skills...</p>';
+        await loadKbOptions();
+      }
 
       const targetId = id || ('temp-' + Date.now());
       updateWebhookUrl(targetId);
