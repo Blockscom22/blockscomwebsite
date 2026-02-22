@@ -269,7 +269,13 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 800px;
+        }
+
+        /* Desktop: keep a reasonable min-width */
+        @media (min-width: 901px) {
+            table {
+                min-width: 900px;
+            }
         }
 
         th {
@@ -386,6 +392,12 @@
             justify-content: space-between;
         }
 
+        @media (max-width: 900px) {
+            .mobile-header {
+                display: flex;
+            }
+        }
+
         .hamburger {
             background: transparent;
             border: none;
@@ -395,6 +407,80 @@
             align-items: center;
             justify-content: center;
             padding: 8px;
+        }
+
+        /* ======= MOBILE CARD LAYOUT ======= */
+        @media (max-width: 900px) {
+            .table-responsive {
+                border: none;
+                background: transparent;
+                border-radius: 0;
+                overflow: visible;
+            }
+
+            table,
+            thead,
+            tbody,
+            th,
+            td,
+            tr {
+                display: block;
+            }
+
+            thead tr {
+                display: none;
+            }
+
+            tbody tr {
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                margin-bottom: 16px;
+                padding: 16px;
+            }
+
+            td {
+                padding: 8px 0;
+                border-bottom: none;
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 12px;
+                font-size: 0.85rem;
+            }
+
+            td:not(:last-child) {
+                border-bottom: 1px solid var(--border);
+                padding-bottom: 12px;
+                margin-bottom: 4px;
+            }
+
+            td::before {
+                content: attr(data-label);
+                font-size: 0.7rem;
+                font-weight: 700;
+                color: var(--text-dim);
+                text-transform: uppercase;
+                min-width: 90px;
+                flex-shrink: 0;
+                padding-top: 2px;
+            }
+
+            td:last-child {
+                flex-direction: column;
+            }
+
+            .empty-state-row td {
+                display: block;
+            }
+
+            .empty-state-row td::before {
+                display: none;
+            }
+
+            h1 {
+                font-size: 1.3rem;
+            }
         }
     </style>
 </head>
@@ -536,7 +622,7 @@
 
                 const tbody = document.getElementById('orders-table-body');
                 if (orders.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><h3>No active orders yet</h3><p>Your AI assistant will magically put new orders here.</p></td></tr>';
+                    tbody.innerHTML = '<tr class="empty-state-row"><td colspan="7" class="empty-state"><h3>No active orders yet</h3><p>Your AI assistant will magically put new orders here.</p></td></tr>';
                     return;
                 }
 
@@ -547,26 +633,31 @@
 
                     // Build source / conversation column
                     let sourceHtml = '';
+                    const fbPageNumericId = order.fb_pages?.fb_page_id || '';
                     if (order.source === 'widget') {
                         sourceHtml = '<span class="badge badge-widget">🌐 Website</span>';
                     } else if (order.sender_id) {
                         sourceHtml = `<a class="conv-link" href="https://www.facebook.com/messages/t/${escapeHtml(order.sender_id)}" target="_blank" rel="noopener">💬 View Conversation</a>`;
+                    } else if (fbPageNumericId) {
+                        sourceHtml = `<a class="conv-link" href="https://www.facebook.com/${escapeHtml(fbPageNumericId)}/inbox/" target="_blank" rel="noopener">📱 Page Inbox</a>`;
                     } else {
                         sourceHtml = '<span class="badge badge-webhook">📱 Messenger</span>';
                     }
 
                     return `
             <tr>
-              <td><div style="color:var(--text-muted); font-size:0.8rem">${date}</div></td>
-              <td>
-                <div style="font-weight:600">${escapeHtml(order.customer_name)}</div>
-                <div style="color:var(--text-dim); font-size:0.8rem; margin-top:4px">${escapeHtml(order.customer_contact)}</div>
+              <td data-label="Date"><div style="color:var(--text-muted); font-size:0.8rem">${date}</div></td>
+              <td data-label="Customer">
+                <div>
+                  <div style="font-weight:600">${escapeHtml(order.customer_name)}</div>
+                  <div style="color:var(--text-dim); font-size:0.8rem; margin-top:4px">${escapeHtml(order.customer_contact)}</div>
+                </div>
               </td>
-              <td><div style="white-space:pre-wrap; max-width:250px">${escapeHtml(order.shipping_address)}</div></td>
-              <td>${itemsHtml}</td>
-              <td style="font-weight:700; color:var(--success)">$${order.total_amount}</td>
-              <td>${sourceHtml}</td>
-              <td>
+              <td data-label="Shipping"><div style="white-space:pre-wrap; max-width:250px">${escapeHtml(order.shipping_address)}</div></td>
+              <td data-label="Items">${itemsHtml}</td>
+              <td data-label="Total" style="font-weight:700; color:var(--success)">$${order.total_amount}</td>
+              <td data-label="Source">${sourceHtml}</td>
+              <td data-label="Status">
                 <div class="badge ${badgeClass}">${order.status}</div>
                 <select class="select-status" onchange="updateOrderStatus('${order.id}', this.value)">
                   <option value="PENDING" ${order.status === 'PENDING' ? 'selected' : ''}>PENDING</option>
