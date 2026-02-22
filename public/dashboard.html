@@ -1011,10 +1011,8 @@
           <div>
             <label>AI Intelligence Model</label>
             <select id="p-model" class="input">
-              <option value="openai/gpt-oss-20b:free" data-tier="free">Free Light Model 1</option>
-              <option value="openai/gpt-oss-120b:free" data-tier="free">Free Light Model 2</option>
-              <option value="stepfun/step-3.5-flash:free" data-tier="free">Free Light Model 3</option>
-              <option value="arcee-ai/trinity-large-preview:free" data-tier="free">Free Light Model 4 (Default)</option>
+              <option value="arcee-ai/trinity-large-preview:free" data-tier="free">Free Default</option>
+              <option value="stepfun/step-3.5-flash:free" data-tier="free">Free Default 2</option>
               <option value="openai/gpt-oss-20b" data-tier="paid">Mid Model 1 (Default)</option>
               <option value="openai/gpt-oss-120b" data-tier="paid">Mid Model 2</option>
               <option value="google/gemini-2.5-flash-lite" data-tier="paid">Flash Light Model</option>
@@ -2206,6 +2204,8 @@
 
           let modelVal = p.ai_model || 'arcee-ai/trinity-large-preview:free';
           // Migrate legacy model IDs
+          if (modelVal === 'openai/gpt-oss-20b:free') modelVal = 'arcee-ai/trinity-large-preview:free';
+          if (modelVal === 'openai/gpt-oss-120b:free') modelVal = 'arcee-ai/trinity-large-preview:free';
           if (modelVal === 'openai/gpt-5.2') modelVal = 'openai/gpt-5-nano';
           if (modelVal === 'anthropic/claude-3-sonnet') modelVal = 'openai/gpt-oss-20b';
           if (modelVal === 'anthropic/claude-3.5-sonnet') modelVal = 'openai/gpt-oss-20b';
