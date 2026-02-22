@@ -1061,31 +1061,15 @@
           <h3>🧠 Chatbot Personality</h3>
           <p style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">Choose how your AI chatbot should
             communicate. This sets the default tone for all conversations.</p>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px">
-            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
-              onclick="applyPersonalityTemplate('friendly')">
-              <div style="font-size:1.2rem; margin-bottom:6px">🤝</div>
-              <div style="font-weight:700; font-size:0.85rem">Friendly Assistant</div>
-              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Warm, natural, concise replies</div>
-            </div>
-            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
-              onclick="applyPersonalityTemplate('professional')">
-              <div style="font-size:1.2rem; margin-bottom:6px">🎯</div>
-              <div style="font-weight:700; font-size:0.85rem">Professional</div>
-              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Formal, business-like tone</div>
-            </div>
-            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
-              onclick="applyPersonalityTemplate('energetic')">
-              <div style="font-size:1.2rem; margin-bottom:6px">🎉</div>
-              <div style="font-weight:700; font-size:0.85rem">Energetic Seller</div>
-              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Upbeat, sales-focused energy</div>
-            </div>
-            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
-              onclick="applyPersonalityTemplate('custom')">
-              <div style="font-size:1.2rem; margin-bottom:6px">✍️</div>
-              <div style="font-weight:700; font-size:0.85rem">Custom</div>
-              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Write your own personality</div>
-            </div>
+          <div style="display:flex; gap:10px; margin-top:10px; align-items:center">
+            <select id="personality-select" class="input" style="flex:1; margin:0">
+              <option value="friendly">🤝 Friendly Assistant — Warm, natural, concise</option>
+              <option value="professional">🎯 Professional — Formal, business-like</option>
+              <option value="energetic">🎉 Energetic Seller — Upbeat, sales-focused</option>
+              <option value="custom">✍️ Custom — Write your own</option>
+            </select>
+            <button type="button" class="btn btn-primary" style="padding:10px 20px; white-space:nowrap"
+              onclick="applyPersonalityTemplate()">Set</button>
           </div>
           <div id="personality-status" style="font-size:0.75rem; color:var(--success); margin-top:8px; display:none">
           </div>
@@ -2960,7 +2944,8 @@ Your replies must feel like:
       custom: ''
     };
 
-    async function applyPersonalityTemplate(templateKey) {
+    async function applyPersonalityTemplate() {
+      const templateKey = document.getElementById('personality-select').value;
       const content = PERSONALITY_TEMPLATES[templateKey];
       const statusEl = document.getElementById('personality-status');
 
@@ -2970,37 +2955,49 @@ Your replies must feel like:
         if (personalityKb) {
           openKbModal(personalityKb.id);
         } else {
-          alert('PERSONALITY skill not found. Please refresh the page.');
+          // Create it first, then open editor
+          try {
+            await fetch('/api/knowledge', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+              body: JSON.stringify({ title: 'PERSONALITY', content: '' })
+            });
+            kbLoaded = false;
+            await loadKbOptions();
+            const newEntry = kbOptions.find(k => k.title === 'PERSONALITY');
+            if (newEntry) openKbModal(newEntry.id);
+          } catch (e) {
+            alert('Error creating personality: ' + e.message);
+          }
         }
         return;
       }
 
-      // Find the PERSONALITY KB entry
-      const personalityKb = kbOptions.find(k => k.title === 'PERSONALITY');
-      if (!personalityKb) {
-        alert('PERSONALITY skill not found. Please refresh the page.');
-        return;
-      }
-
-      // Highlight selected template
-      document.querySelectorAll('#personality-picker-section .template-card').forEach(card => {
-        card.style.borderColor = 'var(--border)';
-      });
-      event.currentTarget.style.borderColor = '#c084fc';
+      // Find the PERSONALITY KB entry or create it via API
+      let personalityKb = kbOptions.find(k => k.title === 'PERSONALITY');
 
       try {
-        const res = await fetch('/api/knowledge', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${currentSession.access_token}`
-          },
-          body: JSON.stringify({ id: personalityKb.id, title: 'PERSONALITY', content })
-        });
-        if (!res.ok) throw new Error('Failed to update personality');
-
-        // Update local cache
-        personalityKb.content = content;
+        if (personalityKb) {
+          // Update existing
+          const res = await fetch('/api/knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+            body: JSON.stringify({ id: personalityKb.id, title: 'PERSONALITY', content })
+          });
+          if (!res.ok) throw new Error('Failed to update personality');
+          personalityKb.content = content;
+        } else {
+          // Create new
+          const res = await fetch('/api/knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+            body: JSON.stringify({ title: 'PERSONALITY', content })
+          });
+          if (!res.ok) throw new Error('Failed to create personality');
+          // Refresh KB cache
+          kbLoaded = false;
+          await loadKbOptions();
+        }
 
         const labels = { friendly: '🤝 Friendly Assistant', professional: '🎯 Professional', energetic: '🎉 Energetic Seller' };
         statusEl.innerText = `✓ Personality set to: ${labels[templateKey]}`;

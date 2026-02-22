@@ -332,9 +332,8 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
   // Ensure PERSONALITY exists for existing users who don't have one yet
   const hasPersonality = data.some(k => k.title === 'PERSONALITY');
   if (!hasPersonality) {
-    await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title: 'PERSONALITY', content: DEFAULT_PERSONALITY_CONTENT }]);
-    const { data: refreshed } = await supabase.from('knowledge_entries').select('*').eq('profile_id', req.user.id);
-    return res.json(refreshed || []);
+    const { data: inserted } = await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title: 'PERSONALITY', content: DEFAULT_PERSONALITY_CONTENT }]).select();
+    if (inserted && inserted.length > 0) data.unshift(inserted[0]);
   }
 
   res.json(data);
