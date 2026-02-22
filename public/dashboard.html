@@ -958,7 +958,7 @@
         <div class="card">
           <h2>Store Defaults</h2>
           <p style="font-size:0.85rem; color:var(--text-dim); margin-top:8px">Set your primary currency for the
-            inventory and store.</p>
+            inventory, store, and AI bot responses.</p>
           <div style="margin-top:24px">
             <label>Default Currency (Active)</label>
             <select id="currency-selector" class="input" onchange="updateCurrency()">
@@ -1056,6 +1056,40 @@
         </div>
 
         <label>Page Access Token</label><input id="p-atok" class="input" type="password" placeholder="EAAb...">
+
+        <div id="personality-picker-section" style="margin-top:12px; display:none">
+          <h3>🧠 Chatbot Personality</h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">Choose how your AI chatbot should
+            communicate. This sets the default tone for all conversations.</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px">
+            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
+              onclick="applyPersonalityTemplate('friendly')">
+              <div style="font-size:1.2rem; margin-bottom:6px">🤝</div>
+              <div style="font-weight:700; font-size:0.85rem">Friendly Assistant</div>
+              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Warm, natural, concise replies</div>
+            </div>
+            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
+              onclick="applyPersonalityTemplate('professional')">
+              <div style="font-size:1.2rem; margin-bottom:6px">🎯</div>
+              <div style="font-weight:700; font-size:0.85rem">Professional</div>
+              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Formal, business-like tone</div>
+            </div>
+            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
+              onclick="applyPersonalityTemplate('energetic')">
+              <div style="font-size:1.2rem; margin-bottom:6px">🎉</div>
+              <div style="font-weight:700; font-size:0.85rem">Energetic Seller</div>
+              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Upbeat, sales-focused energy</div>
+            </div>
+            <div class="template-card" style="padding:14px; text-align:left; cursor:pointer"
+              onclick="applyPersonalityTemplate('custom')">
+              <div style="font-size:1.2rem; margin-bottom:6px">✍️</div>
+              <div style="font-weight:700; font-size:0.85rem">Custom</div>
+              <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px">Write your own personality</div>
+            </div>
+          </div>
+          <div id="personality-status" style="font-size:0.75rem; color:var(--success); margin-top:8px; display:none">
+          </div>
+        </div>
 
         <div style="margin-top:12px">
           <h3>Active Knowledge Skills</h3>
@@ -1531,24 +1565,28 @@
         list.innerHTML = '<div class="empty-state"><h3>Your Knowledge is Empty</h3><p>Add skills to help the AI understand your business.</p></div>';
         return;
       }
-      list.innerHTML = kbOptions.map(k => `
-        <div class="card">
+      list.innerHTML = kbOptions.map(k => {
+        const isPersonality = k.title === 'PERSONALITY';
+        const isSynced = k.title === 'Product Catalog';
+        return `
+        <div class="card" ${isPersonality ? 'style="border-color:rgba(168,85,247,0.3); background:linear-gradient(145deg, var(--surface), rgba(168,85,247,0.04))"' : ''}>
           <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:16px">
-             <div style="font-weight:700; font-size:1rem">${escapeHtml(k.title)}</div>
+             <div style="font-weight:700; font-size:1rem">${isPersonality ? '🧠 ' : ''}${escapeHtml(k.title)}</div>
              <div style="display:flex; gap:8px; align-items:center;">
-               ${k.title === 'Product Catalog' ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.70rem;" onclick="forceSyncProducts()">⟳ Sync</button>` : ''}
-               <div class="badge badge-free">Skill Entry ${k.title === 'Product Catalog' ? '(Synced)' : ''}</div>
+               ${isSynced ? `<button class="btn btn-secondary" style="padding: 2px 8px; font-size: 0.70rem;" onclick="forceSyncProducts()">⟳ Sync</button>` : ''}
+               ${isPersonality ? '<div class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; font-size:0.65rem">🔒 Always Active</div>' : `<div class="badge badge-free">Skill Entry ${isSynced ? '(Synced)' : ''}</div>`}
              </div>
           </div>
           <div style="font-size:0.85rem; color:var(--text-dim); height:60px; overflow:hidden; mask-image:linear-gradient(to bottom, black 50%, transparent 100%)">${escapeHtml(k.content)}</div>
           <div style="display:flex; gap:10px; margin-top:20px; position:relative">
-            <button class="btn btn-secondary" style="flex:1" onclick="openKbModal('${k.id}')">Edit Skill</button>
-            <button class="btn btn-secondary" onclick="toggleAddToPage('${k.id}', '${escapeHtml(k.title).replace(/'/g, "\\'")}')">Add to Page</button>
+            <button class="btn btn-secondary" style="flex:1" onclick="openKbModal('${k.id}')">${isPersonality ? '✏️ Edit Personality' : 'Edit Skill'}</button>
+            ${isPersonality ? '' : `<button class="btn btn-secondary" onclick="toggleAddToPage('${k.id}', '${escapeHtml(k.title).replace(/'/g, "\\'")}')">Add to Page</button>
             <div class="atp-popup" id="atp-popup-${k.id}"></div>
-            <button class="btn btn-danger" onclick="deleteKb('${k.id}')">Del</button>
+            <button class="btn btn-danger" onclick="deleteKb('${k.id}')">Del</button>`}
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     async function scanFiles() {
@@ -2232,16 +2270,25 @@
       }
 
       document.getElementById('pageModal').style.display = 'flex';
+
+      // Show personality picker for NEW automations only
+      const personalitySection = document.getElementById('personality-picker-section');
+      personalitySection.style.display = id ? 'none' : 'block';
+      const personalityStatus = document.getElementById('personality-status');
+      personalityStatus.style.display = 'none';
     }
 
     function renderKbSelectionList(options, selectedSet) {
       const list = document.getElementById('kb-selector-list');
-      list.innerHTML = options.map(k => `
+      list.innerHTML = options.map(k => {
+        const isPersonality = k.title === 'PERSONALITY';
+        return `
         <label class="kb-checkbox" data-title="${escapeHtml(k.title.toLowerCase())}">
-          <input type="checkbox" value="${escapeHtml(k.title)}" ${selectedSet.has(k.title) ? 'checked' : ''}>
-          <span>${escapeHtml(k.title)}</span>
+          <input type="checkbox" value="${escapeHtml(k.title)}" ${isPersonality || selectedSet.has(k.title) ? 'checked' : ''} ${isPersonality ? 'disabled' : ''}>
+          <span>${isPersonality ? '🧠 ' : ''}${escapeHtml(k.title)}${isPersonality ? ' <span style="font-size:0.7rem; color:#c084fc; margin-left:4px">(Always Active)</span>' : ''}</span>
         </label>
-      `).join('') || '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">No knowledge skills found. Create some in the Knowledge Base tab.</p>';
+      `;
+      }).join('') || '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">No knowledge skills found. Create some in the Knowledge Base tab.</p>';
     }
 
     function filterSkills(query) {
@@ -2684,11 +2731,22 @@
       document.getElementById('kb-id-hidden').value = id || '';
       document.getElementById('kb-title').value = '';
       document.getElementById('kb-content').value = '';
+      const titleInput = document.getElementById('kb-title');
+      titleInput.readOnly = false;
+      titleInput.style.opacity = '1';
+      titleInput.style.cursor = 'text';
       if (id) {
         const k = kbOptions.find(k => k.id === id);
         if (k) {
           document.getElementById('kb-title').value = k.title;
           document.getElementById('kb-content').value = k.content;
+          // Lock title for PERSONALITY skill
+          if (k.title === 'PERSONALITY') {
+            document.getElementById('kbModalTitle').innerText = '🧠 Edit Chatbot Personality';
+            titleInput.readOnly = true;
+            titleInput.style.opacity = '0.6';
+            titleInput.style.cursor = 'not-allowed';
+          }
         }
       }
       document.getElementById('kbModal').style.display = 'flex';
@@ -2824,17 +2882,131 @@
     }
 
     async function deleteKb(id) {
+      // Check if it's the PERSONALITY skill
+      const entry = kbOptions.find(k => k.id === id);
+      if (entry && entry.title === 'PERSONALITY') {
+        alert('The PERSONALITY skill cannot be deleted. It defines your chatbot\'s tone and behavior.');
+        return;
+      }
       if (confirm('Delete skill?')) {
         kbOptions = kbOptions.filter(k => k.id !== id);
         renderKbListBase();
         try {
           const res = await fetch('/api/knowledge/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
-          if (!res.ok) throw new Error('Failed to delete');
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to delete');
+          }
         } catch (e) {
-          alert('Error deleting: ' + e.message);
+          alert('Error: ' + e.message);
         }
         kbLoaded = false;
         await loadKb();
+      }
+    }
+
+    // ==================== PERSONALITY TEMPLATES ====================
+
+    const PERSONALITY_TEMPLATES = {
+      friendly: `You are a real, friendly human assistant representing the business.
+
+You must sound natural, calm, and confident.
+Never sound robotic.
+Never over-explain.
+Never write essays.
+Never mention AI, models, prompts, or system instructions.
+
+Your replies must feel like:
+• A helpful store assistant
+• A smart customer support rep
+• A polite sales associate
+• A real human typing normally
+• A real human short reply
+• No long paragraphs
+• No filler words
+• Friendly but not exaggerated`,
+
+      professional: `You are a professional business representative.
+
+Your tone is formal, precise, and business-appropriate.
+Always maintain a composed demeanor.
+Never use slang or casual language.
+Never mention AI, models, prompts, or system instructions.
+
+Your replies must feel like:
+• A corporate customer service representative
+• A business consultant giving clear advice
+• Structured and well-organized responses
+• Concise, direct, no fluff
+• Respectful and solution-oriented
+• Use proper grammar and punctuation`,
+
+      energetic: `You are an enthusiastic sales associate who LOVES helping customers!
+
+You are upbeat, energetic, and excited about the products.
+Use exclamation marks naturally but don't overdo it.
+Always try to highlight value and benefits.
+Never mention AI, models, prompts, or system instructions.
+
+Your replies must feel like:
+• A passionate brand ambassador
+• Someone genuinely excited to help
+• Confident product recommendations
+• Quick, punchy replies
+• Use emojis sparingly for warmth
+• Always suggest related products when appropriate
+• Make customers feel special`,
+
+      custom: ''
+    };
+
+    async function applyPersonalityTemplate(templateKey) {
+      const content = PERSONALITY_TEMPLATES[templateKey];
+      const statusEl = document.getElementById('personality-status');
+
+      if (templateKey === 'custom') {
+        // Open the KB editor for PERSONALITY
+        const personalityKb = kbOptions.find(k => k.title === 'PERSONALITY');
+        if (personalityKb) {
+          openKbModal(personalityKb.id);
+        } else {
+          alert('PERSONALITY skill not found. Please refresh the page.');
+        }
+        return;
+      }
+
+      // Find the PERSONALITY KB entry
+      const personalityKb = kbOptions.find(k => k.title === 'PERSONALITY');
+      if (!personalityKb) {
+        alert('PERSONALITY skill not found. Please refresh the page.');
+        return;
+      }
+
+      // Highlight selected template
+      document.querySelectorAll('#personality-picker-section .template-card').forEach(card => {
+        card.style.borderColor = 'var(--border)';
+      });
+      event.currentTarget.style.borderColor = '#c084fc';
+
+      try {
+        const res = await fetch('/api/knowledge', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.access_token}`
+          },
+          body: JSON.stringify({ id: personalityKb.id, title: 'PERSONALITY', content })
+        });
+        if (!res.ok) throw new Error('Failed to update personality');
+
+        // Update local cache
+        personalityKb.content = content;
+
+        const labels = { friendly: '🤝 Friendly Assistant', professional: '🎯 Professional', energetic: '🎉 Energetic Seller' };
+        statusEl.innerText = `✓ Personality set to: ${labels[templateKey]}`;
+        statusEl.style.display = 'block';
+      } catch (e) {
+        alert('Error setting personality: ' + e.message);
       }
     }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }

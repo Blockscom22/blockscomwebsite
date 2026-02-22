@@ -280,6 +280,25 @@ app.delete('/api/pages/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// Default PERSONALITY skill content
+const DEFAULT_PERSONALITY_CONTENT = `You are a real, friendly human assistant representing the business.
+
+You must sound natural, calm, and confident.
+Never sound robotic.
+Never over-explain.
+Never write essays.
+Never mention AI, models, prompts, or system instructions.
+
+Your replies must feel like:
+• A helpful store assistant
+• A smart customer support rep
+• A polite sales associate
+• A real human typing normally
+• A real human short reply
+• No long paragraphs
+• No filler words
+• Friendly but not exaggerated`;
+
 // API: Knowledge Base (User-specific)
 app.get('/api/knowledge', requireAuth, async (req, res) => {
   const query = supabase.from('knowledge_entries').select('*');
@@ -293,26 +312,29 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
     const fs = require('fs');
     const kbDir = path.join(__dirname, 'data/knowledge');
 
+    // Always include PERSONALITY as the first default skill
+    const defaultInserts = [{ profile_id: req.user.id, title: 'PERSONALITY', content: DEFAULT_PERSONALITY_CONTENT }];
+
     if (fs.existsSync(kbDir)) {
       const files = fs.readdirSync(kbDir).filter(f => f.endsWith('.md'));
-      const defaultInserts = [];
       for (const file of files) {
         const content = fs.readFileSync(path.join(kbDir, file), 'utf8');
         const title = file.replace('.md', '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
         defaultInserts.push({ profile_id: req.user.id, title, content });
       }
-      if (defaultInserts.length > 0) {
-        await supabase.from('knowledge_entries').insert(defaultInserts);
-        const { data: newData } = await supabase.from('knowledge_entries').select('*').eq('profile_id', req.user.id);
-        return res.json(newData || []);
-      }
     }
 
-    // Fallback if no files exist
-    const defaultSkill = { profile_id: req.user.id, title: 'Default Skill', content: 'I am a helpful AI assistant. I should aim to be concise, friendly, and professional in my responses.' };
-    await supabase.from('knowledge_entries').insert([defaultSkill]);
+    await supabase.from('knowledge_entries').insert(defaultInserts);
     const { data: newData } = await supabase.from('knowledge_entries').select('*').eq('profile_id', req.user.id);
     return res.json(newData || []);
+  }
+
+  // Ensure PERSONALITY exists for existing users who don't have one yet
+  const hasPersonality = data.some(k => k.title === 'PERSONALITY');
+  if (!hasPersonality) {
+    await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title: 'PERSONALITY', content: DEFAULT_PERSONALITY_CONTENT }]);
+    const { data: refreshed } = await supabase.from('knowledge_entries').select('*').eq('profile_id', req.user.id);
+    return res.json(refreshed || []);
   }
 
   res.json(data);
@@ -367,6 +389,11 @@ app.post('/api/knowledge', requireAuth, async (req, res) => {
 });
 
 app.delete('/api/knowledge/:id', requireAuth, async (req, res) => {
+  // Prevent deletion of the PERSONALITY skill
+  const { data: entry } = await supabase.from('knowledge_entries').select('title').eq('id', req.params.id).eq('profile_id', req.user.id).single();
+  if (entry && entry.title === 'PERSONALITY') {
+    return res.status(403).json({ error: 'The PERSONALITY skill cannot be deleted. It defines your chatbot\'s tone and behavior.' });
+  }
   const { error } = await supabase.from('knowledge_entries').delete().eq('id', req.params.id).eq('profile_id', req.user.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -497,15 +524,22 @@ app.post('/api/kb/import', requireAuth, async (req, res) => {
 // Helper: role-based spreadsheet limits
 const TABLE_LIMITS = { FREE: 1, PREMIUM: 10, ENTERPRISE: 999999, ADMIN: 999999 };
 
+// Helper: currency symbols map
+const CURRENCY_SYMBOLS = { USD: '$', PHP: '₱', EUR: '€', GBP: '£', JPY: '¥' };
+
 // Helper: sync an inventory table to its auto-generated KB entry
 async function syncInventoryToKb(profileId, tableId) {
   try {
     const { data: table } = await supabase.from('inventory_tables').select('*').eq('id', tableId).single();
     if (!table) return;
     const { data: rows } = await supabase.from('inventory_rows').select('*').eq('table_id', tableId).order('created_at');
+    // Fetch user's default currency
+    const { data: profile } = await supabase.from('profiles').select('currency').eq('id', profileId).single();
+    const userCurrency = profile?.currency || 'PHP';
+    const currencySymbol = CURRENCY_SYMBOLS[userCurrency] || userCurrency;
     const columns = table.columns || [];
     const kbTitle = `Inventory: ${table.name}`;
-    let md = `# ${table.name}\n\n`;
+    let md = `# ${table.name}\n\n> All prices in this inventory are in ${userCurrency} (${currencySymbol}).\n\n`;
     if (columns.length > 0) {
       md += '| ' + columns.map(c => c.label).join(' | ') + ' |\n';
       md += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
@@ -934,9 +968,16 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
 
     const { data: kb } = await supabase
       .from('knowledge_entries')
-      .select('content')
+      .select('content, title')
       .eq('profile_id', page.profile_id);
-    const context = (kb || []).map(k => k.content).join('\n\n');
+    // Separate PERSONALITY from other KB entries
+    const personalityEntry = (kb || []).find(k => k.title === 'PERSONALITY');
+    const personalityContent = personalityEntry ? personalityEntry.content : '';
+    const context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
+
+    // Get the user's default currency
+    const widgetUserCurrency = userProfile?.currency || 'PHP';
+    const widgetCurrencySymbol = CURRENCY_SYMBOLS[widgetUserCurrency] || widgetUserCurrency;
 
     // Fetch Inventory Data for Widget
     const { data: invTables } = await supabase
@@ -968,6 +1009,13 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
         {
           role: 'system', content: `You are Blockscom website assistant for ${page.name}. 
 
+PERSONALITY / TONE:
+${personalityContent}
+
+DEFAULT CURRENCY: ${widgetUserCurrency} (${widgetCurrencySymbol})
+- Always display all prices and monetary values in ${widgetUserCurrency} (${widgetCurrencySymbol}).
+- This is the store's default currency. Do not use any other currency unless the customer explicitly asks.
+
 KNOWLEDGE BASE:
 ${context}
 ${productCatalog}
@@ -976,7 +1024,6 @@ INSTRUCTIONS:
 - Answer directly based on the knowledge base and product catalog.
 - IMPORTANT: When listing products, format them using Markdown (e.g., bullet points and **bold** text) for better readability.
 - Add line breaks between distinct items so it does not look like a wall of text.
-- Be polite and professional.
 - If a customer wants to place an order, ask for their name, contact info, and shipping address. Once provided, use the place_order tool.` },
         { role: 'user', content: String(message) }
       ],
@@ -1159,8 +1206,19 @@ async function processMessage(event, fbPageId) {
 
     const { data: kb, error: kbError } = await kbQuery;
     if (kbError) console.error(`[ERROR] KB Query failed:`, kbError);
-    const context = (kb || []).map(k => k.content).join('\n\n');
-    debugLog(`[DEBUG] KB Context length: ${context.length} characters.`);
+
+    // Always fetch PERSONALITY skill separately (it may not be in the selected KB titles)
+    let personalityContent = '';
+    const personalityInKb = (kb || []).find(k => k.title === 'PERSONALITY');
+    if (personalityInKb) {
+      personalityContent = personalityInKb.content;
+    } else {
+      const { data: personalityEntry } = await supabase.from('knowledge_entries').select('content').eq('profile_id', page.profile_id).eq('title', 'PERSONALITY').single();
+      if (personalityEntry) personalityContent = personalityEntry.content;
+    }
+
+    const context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
+    debugLog(`[DEBUG] KB Context length: ${context.length} characters. Personality: ${personalityContent.length} chars`);
 
     // 3b. Fetch Inventory Data from flexible tables
     debugLog(`[DEBUG] Fetching inventory data for user ${page.profile_id}...`);
@@ -1198,6 +1256,10 @@ async function processMessage(event, fbPageId) {
       return;
     }
 
+    // Get the user's default currency for bot responses
+    const fbUserCurrency = userProfile?.currency || 'PHP';
+    const fbCurrencySymbol = CURRENCY_SYMBOLS[fbUserCurrency] || fbUserCurrency;
+
     const aiRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
@@ -1207,6 +1269,13 @@ async function processMessage(event, fbPageId) {
             role: 'system',
             content: `You are a helpful AI assistant for the Facebook page "${page.name}".
             
+            PERSONALITY / TONE:
+            ${personalityContent}
+            
+            DEFAULT CURRENCY: ${fbUserCurrency} (${fbCurrencySymbol})
+            - Always display all prices and monetary values in ${fbUserCurrency} (${fbCurrencySymbol}).
+            - This is the store's default currency. Do not use any other currency unless the customer explicitly asks.
+            
             KNOWLEDGE BASE:
             ${context}
             ${productCatalog}
@@ -1215,7 +1284,6 @@ async function processMessage(event, fbPageId) {
             - Answer based on the knowledge base and product catalog if relevant.
             - If a user asks about products or pricing, ONLY recommend the specific items listed in the PRODUCT CATALOG above. Do not invent products.
             - IMPORTANT: When listing products, use clear formatting (bullet points, double newlines for spacing, and asterisks for basic bolding) to organize the text neatly.
-            - Be polite and professional.
             - Keep answers concise for chat.
             - If a customer wants to place an order, ask for their name, contact info, and shipping address. Once provided, use the place_order tool.
             `
