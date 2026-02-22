@@ -712,7 +712,7 @@
       <div class="nav-item" id="nav-products" onclick="showView('products')">Inventory System</div>
       <div class="nav-item" id="nav-images" onclick="showView('images')">Images</div>
       <div class="nav-item" id="nav-logs" onclick="showView('logs')">Live Activity</div>
-      <div class="nav-item" onclick="window.location.href='/orders.html'">Orders</div>
+      <div class="nav-item" onclick="checkOrdersAccess()">Orders</div>
     </div>
 
     <div class="nav-group">
@@ -1984,6 +1984,13 @@
     function showView(view) {
       // Close sidebar on mobile after selecting a page
       document.querySelector('.sidebar').classList.remove('open');
+
+      // Guard for FREE tier trying to access premium features
+      if (view === 'images' && me && me.role === 'FREE') {
+        alert('Image upload and Trigger Photos are only available for Premium Members. Free members can only use Auto reply features.');
+        return; // Block view change
+      }
+
       // Guard: only ADMIN can access the admin view
       if (view === 'admin' && (!me || me.role !== 'ADMIN')) {
         view = 'pages';
@@ -3690,6 +3697,14 @@ Your replies must feel like:
         if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to delete'); }
       } catch (e) { alert('Error: ' + e.message); }
       await loadImages();
+    }
+
+    function checkOrdersAccess() {
+      if (me && me.role === 'FREE') {
+        alert('Order Page taking features are only available for Premium Members. Free members can only use Auto reply features.');
+      } else {
+        window.location.href = '/orders.html';
+      }
     }
 
     init();

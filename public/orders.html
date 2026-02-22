@@ -596,6 +596,11 @@
             if (cachedMeStr) {
                 try {
                     const cachedMe = JSON.parse(cachedMeStr);
+                    if (cachedMe.role === 'FREE') {
+                        alert('Order Page taking features are only available for Premium Members. Free members can only use Auto reply features.');
+                        window.location.href = '/dashboard';
+                        return;
+                    }
                     document.getElementById('u-tier').innerText = `${cachedMe.role} TIER`;
                     document.getElementById('u-credits').innerText = `${(cachedMe.credits || 0).toLocaleString()} Credits`;
                     if (cachedMe.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
@@ -613,6 +618,12 @@
                     if (!res.ok) { logout(); return; }
                     const me = await res.json();
                     localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
+
+                    if (me.role === 'FREE') {
+                        alert('Order Page taking features are only available for Premium Members. Free members can only use Auto reply features.');
+                        window.location.href = '/dashboard';
+                        return;
+                    }
 
                     document.getElementById('u-email').innerText = me.email;
                     document.getElementById('u-tier').innerText = `${me.role} TIER`;

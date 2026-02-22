@@ -830,6 +830,11 @@ app.get('/api/images', requireAuth, async (req, res) => {
 // API: Upload image (single)
 app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, res) => {
   try {
+    const role = req.user.profile?.role || 'FREE';
+    if (role === 'FREE') {
+      return res.status(403).json({ error: 'Image upload is only available for Premium members.' });
+    }
+
     if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
 
     // Check mime type
@@ -837,7 +842,6 @@ app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, 
     if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.' });
 
     // Check limits
-    const role = req.user.profile.role || 'FREE';
     const limit = IMAGE_LIMITS[role] || 3;
     const { count, error: countErr } = await supabase.from('user_images').select('*', { count: 'exact', head: true }).eq('profile_id', req.user.id);
     if (countErr) return res.status(500).json({ error: countErr.message });
@@ -877,10 +881,14 @@ app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, 
 // API: Upload multiple images at once
 app.post('/api/images/upload-multiple', requireAuth, upload.array('images', 10), async (req, res) => {
   try {
+    const role = req.user.profile?.role || 'FREE';
+    if (role === 'FREE') {
+      return res.status(403).json({ error: 'Image upload is only available for Premium members.' });
+    }
+
     if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No image files provided.' });
 
     const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const role = req.user.profile.role || 'FREE';
     const limit = IMAGE_LIMITS[role] || 3;
     const { count, error: countErr } = await supabase.from('user_images').select('*', { count: 'exact', head: true }).eq('profile_id', req.user.id);
     if (countErr) return res.status(500).json({ error: countErr.message });
@@ -958,6 +966,11 @@ app.get('/api/trigger-photos', requireAuth, async (req, res) => {
 // API: Create or update trigger photo (supports multiple image_ids)
 app.post('/api/trigger-photos', requireAuth, async (req, res) => {
   try {
+    const role = req.user.profile?.role || 'FREE';
+    if (role === 'FREE') {
+      return res.status(403).json({ error: 'Trigger Photos are only available for Premium members.' });
+    }
+
     const { id, image_ids, trigger_words, auto_send_enabled, auto_send_threshold, is_kb_skill } = req.body;
     // Support both old single image_id and new image_ids array
     let imageIdList = image_ids || [];
