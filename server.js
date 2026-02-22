@@ -192,7 +192,7 @@ app.put('/api/me/currency', requireAuth, async (req, res) => {
 // API: Get My Pages
 app.get('/api/pages', requireAuth, async (req, res) => {
   const query = supabase.from('fb_pages').select('*').order('created_at', { ascending: false });
-  if (req.user.profile.role !== 'ADMIN') query.eq('profile_id', req.user.id);
+  query.eq('profile_id', req.user.id);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -261,13 +261,13 @@ app.delete('/api/pages/:id', requireAuth, async (req, res) => {
 // API: Knowledge Base (User-specific)
 app.get('/api/knowledge', requireAuth, async (req, res) => {
   const query = supabase.from('knowledge_entries').select('*');
-  if (req.user.profile.role !== 'ADMIN') query.eq('profile_id', req.user.id);
+  query.eq('profile_id', req.user.id);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
   // Auto-generate Default Skills if empty (and not an admin viewing all skills)
-  if (data.length === 0 && req.user.profile.role !== 'ADMIN') {
+  if (data.length === 0) {
     const fs = require('fs');
     const kbDir = path.join(__dirname, 'data/knowledge');
 
@@ -343,7 +343,7 @@ app.delete('/api/knowledge/:id', requireAuth, async (req, res) => {
 // API: Orders (User-specific)
 app.get('/api/orders', requireAuth, async (req, res) => {
   const query = supabase.from('orders').select('*').order('created_at', { ascending: false });
-  if (req.user.profile.role !== 'ADMIN') query.eq('profile_id', req.user.id);
+  query.eq('profile_id', req.user.id);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -495,7 +495,7 @@ app.get('/api/logs', requireAuth, async (req, res) => {
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
-  const filtered = req.user.profile.role === 'ADMIN' ? data : data.filter(l => l.fb_pages?.profile_id === req.user.id);
+  const filtered = data.filter(l => l.fb_pages?.profile_id === req.user.id);
   res.json(filtered);
 });
 
