@@ -895,7 +895,7 @@
           <div id="img-usage-badge"
             style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:0.75rem; font-weight:700; color:var(--text-muted)">
             0 / 3</div>
-          <button class="btn btn-primary" onclick="openUploadModal()">+ Upload Image</button>
+          <button class="btn btn-primary" onclick="openUploadModal()">+ Upload Images</button>
         </div>
       </div>
 
@@ -1359,12 +1359,12 @@
     </div>
   </div>
 
-  <!-- Modal: Upload Image -->
+  <!-- Modal: Upload Image(s) -->
   <div class="modal-overlay" id="uploadImageModal">
-    <div class="modal" style="max-width:500px">
-      <h2 style="margin-bottom:8px">Upload Image</h2>
-      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:24px">Upload an image to your storage. Max 5MB
-        per file. Supported: JPEG, PNG, GIF, WebP.</p>
+    <div class="modal" style="max-width:600px">
+      <h2 style="margin-bottom:8px">Upload Images</h2>
+      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:24px">Upload one or more images to your storage.
+        Max 5MB per file. Supported: JPEG, PNG, GIF, WebP.</p>
       <div id="upload-drop-zone"
         style="border:2px dashed var(--border); border-radius:16px; padding:40px 24px; text-align:center; cursor:pointer; transition:0.2s; background:var(--bg)"
         onclick="document.getElementById('upload-file-input').click()"
@@ -1372,20 +1372,23 @@
         ondragleave="this.style.borderColor='var(--border)'; this.style.background='var(--bg)'"
         ondrop="event.preventDefault(); this.style.borderColor='var(--border)'; this.style.background='var(--bg)'; handleUploadDrop(event)">
         <div id="upload-preview" style="display:none; margin-bottom:16px">
-          <img id="upload-preview-img" style="max-width:100%; max-height:200px; border-radius:12px; object-fit:contain"
-            alt="preview">
+          <div id="upload-preview-grid"
+            style="display:grid; grid-template-columns:repeat(auto-fill, minmax(80px,1fr)); gap:8px; margin-bottom:8px">
+          </div>
+          <div id="upload-file-count" style="font-size:0.8rem; color:var(--text-dim)"></div>
         </div>
         <div id="upload-placeholder">
           <div style="font-size:2rem; margin-bottom:8px">📸</div>
-          <div style="font-size:0.9rem; font-weight:600; color:var(--text)">Drop image here or click to browse</div>
-          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">JPEG, PNG, GIF, WebP — Max 5MB</div>
+          <div style="font-size:0.9rem; font-weight:600; color:var(--text)">Drop images here or click to browse</div>
+          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">JPEG, PNG, GIF, WebP — Max 5MB each —
+            Select multiple files</div>
         </div>
       </div>
       <input type="file" id="upload-file-input" style="display:none" accept="image/jpeg,image/png,image/gif,image/webp"
-        onchange="handleUploadSelect(event)">
+        multiple onchange="handleUploadSelect(event)">
       <div style="display:flex; gap:12px; margin-top:24px">
         <button class="btn btn-primary" style="flex:1" id="upload-submit-btn" onclick="submitUpload()" disabled>Upload
-          Image</button>
+          Images</button>
         <button class="btn btn-secondary" onclick="closeModal('uploadImageModal'); resetUploadModal()">Cancel</button>
       </div>
     </div>
@@ -1395,24 +1398,21 @@
   <div class="modal-overlay" id="triggerPhotoModal">
     <div class="modal" style="max-width:600px">
       <h2 id="triggerPhotoModalTitle" style="margin-bottom:8px">Create Trigger Photo</h2>
-      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:24px">Configure an image that the AI sends when
+      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:24px">Configure images that the AI sends when
         users say specific trigger words.</p>
       <input type="hidden" id="tp-id-hidden">
 
-      <label>Select Image</label>
-      <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:20px">
-        <select id="tp-image-select" class="input" style="flex:1; margin:0" onchange="previewTriggerImage()">
-          <option value="">-- Choose an uploaded image --</option>
-        </select>
-        <div id="tp-image-preview"
-          style="width:80px; height:80px; border-radius:12px; border:1px solid var(--border); background:var(--bg); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0">
-          <span style="font-size:0.7rem; color:var(--text-dim)">Preview</span>
+      <label>Select Images (choose one or more)</label>
+      <div id="tp-image-checklist"
+        style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:12px; padding:8px; margin-bottom:16px; background:var(--bg)">
+        <div style="text-align:center; padding:12px; color:var(--text-dim); font-size:0.8rem">No images uploaded yet.
         </div>
       </div>
+      <div id="tp-selected-preview" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px"></div>
 
       <label>Trigger Words or Phrases</label>
       <p style="font-size:0.7rem; color:var(--text-dim); margin-top:-4px; margin-bottom:8px">Comma-separated phrases
-        that trigger this image (e.g. "send me photo, send me menu, show me the picture")</p>
+        that trigger these images (e.g. "send me photo, send me menu, show me the picture")</p>
       <input id="tp-trigger-words" class="input" placeholder="e.g. send me photo, send me menu, show me the picture"
         style="margin-top:0">
 
@@ -3285,7 +3285,6 @@ Your replies must feel like:
     // ==================== IMAGES & TRIGGER PHOTOS JS ====================
     let imagesCache = [];
     let triggerPhotosCache = [];
-    let pendingUploadFile = null;
 
     async function loadImages() {
       const gallery = document.getElementById('images-gallery');
@@ -3340,17 +3339,24 @@ Your replies must feel like:
         return;
       }
       list.innerHTML = triggerPhotosCache.map(tp => {
-        const img = tp.user_images;
+        const images = (tp.trigger_photo_images || [])
+          .filter(tpi => tpi.user_images)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        const imgCount = images.length;
         return `
         <div class="card" style="margin-bottom:12px">
           <div style="display:flex; gap:16px; align-items:flex-start">
-            <div style="width:72px; height:72px; border-radius:10px; overflow:hidden; flex-shrink:0; background:var(--bg); border:1px solid var(--border)">
-              ${img ? `<img src="${escapeHtml(img.file_url)}" style="width:100%; height:100%; object-fit:cover" alt="">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:0.7rem;color:var(--text-dim)">No img</div>'}
+            <div style="display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; max-width:160px">
+              ${imgCount > 0 ? images.slice(0, 4).map(tpi => `
+                <div style="width:${imgCount === 1 ? '72' : '36'}px; height:${imgCount === 1 ? '72' : '36'}px; border-radius:8px; overflow:hidden; background:var(--bg); border:1px solid var(--border)">
+                  <img src="${escapeHtml(tpi.user_images.file_url)}" style="width:100%; height:100%; object-fit:cover" alt="">
+                </div>
+              `).join('') + (imgCount > 4 ? `<div style="width:36px; height:36px; border-radius:8px; background:var(--bg); border:1px solid var(--border); display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:var(--text-dim)">+${imgCount - 4}</div>` : '') : '<div style="width:72px; height:72px; border-radius:10px; background:var(--bg); border:1px solid var(--border); display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--text-dim)">No img</div>'}
             </div>
             <div style="flex:1; min-width:0">
               <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px">
                 <div>
-                  <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px">Trigger Photo</div>
+                  <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px">Trigger Photo <span style="font-size:0.75rem; color:var(--text-dim); font-weight:400">(${imgCount} image${imgCount !== 1 ? 's' : ''})</span></div>
                   <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px">
                     ${tp.trigger_words.split(',').map(w => `<span class="badge badge-free" style="font-size:0.65rem">${escapeHtml(w.trim())}</span>`).join('')}
                   </div>
@@ -3371,61 +3377,101 @@ Your replies must feel like:
       }).join('');
     }
 
-    // Upload modal helpers
+    // Upload modal helpers (multi-file)
+    let pendingUploadFiles = [];
+
     function openUploadModal() {
       resetUploadModal();
       document.getElementById('uploadImageModal').style.display = 'flex';
     }
 
     function resetUploadModal() {
-      pendingUploadFile = null;
+      pendingUploadFiles = [];
       document.getElementById('upload-preview').style.display = 'none';
       document.getElementById('upload-placeholder').style.display = 'block';
       document.getElementById('upload-submit-btn').disabled = true;
       document.getElementById('upload-file-input').value = '';
+      document.getElementById('upload-preview-grid').innerHTML = '';
+      document.getElementById('upload-file-count').innerText = '';
     }
 
     function handleUploadDrop(e) {
-      const file = e.dataTransfer.files[0];
-      if (file) setUploadFile(file);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) setUploadFiles(files);
     }
 
     function handleUploadSelect(e) {
-      const file = e.target.files[0];
-      if (file) setUploadFile(file);
+      const files = Array.from(e.target.files);
+      if (files.length > 0) setUploadFiles(files);
     }
 
-    function setUploadFile(file) {
+    function setUploadFiles(files) {
       const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowed.includes(file.type)) { alert('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'); return; }
-      if (file.size > 5 * 1024 * 1024) { alert('File too large. Maximum size is 5MB.'); return; }
-      pendingUploadFile = file;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        document.getElementById('upload-preview-img').src = e.target.result;
-        document.getElementById('upload-preview').style.display = 'block';
-        document.getElementById('upload-placeholder').style.display = 'none';
-        document.getElementById('upload-submit-btn').disabled = false;
-      };
-      reader.readAsDataURL(file);
+      const valid = files.filter(f => {
+        if (!allowed.includes(f.type)) return false;
+        if (f.size > 5 * 1024 * 1024) return false;
+        return true;
+      });
+      if (valid.length === 0) { alert('No valid image files selected. Only JPEG, PNG, GIF, WebP under 5MB.'); return; }
+      if (valid.length < files.length) { alert(`${files.length - valid.length} file(s) were skipped (invalid type or too large).`); }
+
+      pendingUploadFiles = valid;
+      const grid = document.getElementById('upload-preview-grid');
+      grid.innerHTML = '';
+
+      valid.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const div = document.createElement('div');
+          div.style.cssText = 'width:80px; height:80px; border-radius:8px; overflow:hidden; border:1px solid var(--border)';
+          div.innerHTML = `<img src="${e.target.result}" style="width:100%; height:100%; object-fit:cover" alt="">`;
+          grid.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      document.getElementById('upload-file-count').innerText = `${valid.length} file${valid.length > 1 ? 's' : ''} selected`;
+      document.getElementById('upload-preview').style.display = 'block';
+      document.getElementById('upload-placeholder').style.display = 'none';
+      document.getElementById('upload-submit-btn').disabled = false;
     }
 
     async function submitUpload() {
-      if (!pendingUploadFile) return;
+      if (pendingUploadFiles.length === 0) return;
       const btn = document.getElementById('upload-submit-btn');
       btn.disabled = true;
       btn.innerText = 'Uploading...';
 
       try {
-        const fd = new FormData();
-        fd.append('image', pendingUploadFile);
-        const res = await fetch('/api/images/upload', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
-          body: fd
-        });
-        const result = await res.json();
-        if (!res.ok) { alert(result.error || 'Upload failed.'); return; }
+        if (pendingUploadFiles.length === 1) {
+          // Single file — use the original endpoint
+          const fd = new FormData();
+          fd.append('image', pendingUploadFiles[0]);
+          const res = await fetch('/api/images/upload', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
+            body: fd
+          });
+          const result = await res.json();
+          if (!res.ok) { alert(result.error || 'Upload failed.'); return; }
+        } else {
+          // Multiple files
+          const fd = new FormData();
+          pendingUploadFiles.forEach(f => fd.append('images', f));
+          const res = await fetch('/api/images/upload-multiple', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
+            body: fd
+          });
+          const result = await res.json();
+          if (!res.ok) { alert(result.error || 'Upload failed.'); return; }
+          if (result.errors && result.errors.length > 0) {
+            alert(`Uploaded ${result.uploaded.length} image(s). Errors:\n${result.errors.join('\n')}`);
+          }
+          if (result.skipped > 0) {
+            alert(`${result.skipped} file(s) skipped due to your tier limit.`);
+          }
+        }
         closeModal('uploadImageModal');
         resetUploadModal();
         await loadImages();
@@ -3433,12 +3479,12 @@ Your replies must feel like:
         alert('Upload error: ' + e.message);
       } finally {
         btn.disabled = false;
-        btn.innerText = 'Upload Image';
+        btn.innerText = 'Upload Images';
       }
     }
 
     async function deleteImage(id) {
-      if (!confirm('Delete this image? Any linked trigger photos will also be removed.')) return;
+      if (!confirm('Delete this image? It will be removed from any linked trigger photos.')) return;
       try {
         const res = await fetch('/api/images/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
         if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to delete'); }
@@ -3446,7 +3492,7 @@ Your replies must feel like:
       await loadImages();
     }
 
-    // Trigger Photo modal helpers
+    // Trigger Photo modal helpers (multi-image)
     function openTriggerPhotoModal(editId) {
       document.getElementById('tp-id-hidden').value = '';
       document.getElementById('tp-trigger-words').value = '';
@@ -3454,14 +3500,11 @@ Your replies must feel like:
       document.getElementById('tp-threshold-row').style.display = 'none';
       document.getElementById('tp-threshold').value = '10';
       document.getElementById('tp-kb-skill').checked = false;
-      document.getElementById('tp-image-preview').innerHTML = '<span style="font-size:0.7rem; color:var(--text-dim)">Preview</span>';
+      document.getElementById('tp-selected-preview').innerHTML = '';
       document.getElementById('triggerPhotoModalTitle').innerText = 'Create Trigger Photo';
 
-      // Populate image selector
-      const select = document.getElementById('tp-image-select');
-      select.innerHTML = '<option value="">-- Choose an uploaded image --</option>' +
-        imagesCache.map(img => `<option value="${img.id}" data-url="${escapeHtml(img.file_url)}">${escapeHtml(img.file_name)}</option>`).join('');
-
+      // Get selected image IDs from edit mode
+      let selectedImageIds = [];
       if (editId) {
         const tp = triggerPhotosCache.find(t => t.id === editId);
         if (tp) {
@@ -3472,35 +3515,59 @@ Your replies must feel like:
           document.getElementById('tp-threshold').value = tp.auto_send_threshold || '10';
           document.getElementById('tp-kb-skill').checked = !!tp.is_kb_skill;
           document.getElementById('triggerPhotoModalTitle').innerText = 'Edit Trigger Photo';
-          select.value = tp.image_id;
-          previewTriggerImage();
+          selectedImageIds = (tp.trigger_photo_images || []).map(tpi => tpi.image_id);
         }
       }
 
+      // Populate image checklist
+      const checklist = document.getElementById('tp-image-checklist');
+      if (imagesCache.length === 0) {
+        checklist.innerHTML = '<div style="text-align:center; padding:12px; color:var(--text-dim); font-size:0.8rem">No images uploaded yet. Upload images first.</div>';
+      } else {
+        checklist.innerHTML = imagesCache.map(img => {
+          const checked = selectedImageIds.includes(img.id) ? 'checked' : '';
+          return `
+            <label style="display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer; transition:0.15s" onmouseover="this.style.background='var(--surface-elevated)'" onmouseout="this.style.background='transparent'">
+              <input type="checkbox" class="tp-img-checkbox" value="${img.id}" data-url="${escapeHtml(img.file_url)}" data-name="${escapeHtml(img.file_name)}" ${checked} style="accent-color:var(--primary)" onchange="updateTpPreview()">
+              <div style="width:40px; height:40px; border-radius:6px; overflow:hidden; flex-shrink:0; border:1px solid var(--border)">
+                <img src="${escapeHtml(img.file_url)}" style="width:100%; height:100%; object-fit:cover" alt="" loading="lazy">
+              </div>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:0.8rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${escapeHtml(img.file_name)}</div>
+                <div style="font-size:0.65rem; color:var(--text-dim)">${(img.file_size / 1024).toFixed(1)} KB</div>
+              </div>
+            </label>`;
+        }).join('');
+      }
+
+      updateTpPreview();
       document.getElementById('triggerPhotoModal').style.display = 'flex';
     }
 
-    function previewTriggerImage() {
-      const select = document.getElementById('tp-image-select');
-      const option = select.options[select.selectedIndex];
-      const url = option?.getAttribute('data-url');
-      const preview = document.getElementById('tp-image-preview');
-      if (url) {
-        preview.innerHTML = `<img src="${url}" style="width:100%; height:100%; object-fit:cover" alt="">`;
-      } else {
-        preview.innerHTML = '<span style="font-size:0.7rem; color:var(--text-dim)">Preview</span>';
+    function updateTpPreview() {
+      const checkboxes = document.querySelectorAll('.tp-img-checkbox:checked');
+      const preview = document.getElementById('tp-selected-preview');
+      if (checkboxes.length === 0) {
+        preview.innerHTML = '<span style="font-size:0.75rem; color:var(--text-dim)">No images selected.</span>';
+        return;
       }
+      preview.innerHTML = Array.from(checkboxes).map(cb => `
+        <div style="width:56px; height:56px; border-radius:8px; overflow:hidden; border:1px solid var(--border); position:relative" title="${cb.dataset.name}">
+          <img src="${cb.dataset.url}" style="width:100%; height:100%; object-fit:cover" alt="">
+        </div>
+      `).join('');
     }
 
     async function saveTriggerPhoto() {
-      const imageId = document.getElementById('tp-image-select').value;
+      const checkboxes = document.querySelectorAll('.tp-img-checkbox:checked');
+      const imageIds = Array.from(checkboxes).map(cb => cb.value);
       const triggerWords = document.getElementById('tp-trigger-words').value.trim();
-      if (!imageId) { alert('Please select an image.'); return; }
+      if (imageIds.length === 0) { alert('Please select at least one image.'); return; }
       if (!triggerWords) { alert('Please enter at least one trigger word or phrase.'); return; }
 
       const body = {
         id: document.getElementById('tp-id-hidden').value || undefined,
-        image_id: imageId,
+        image_ids: imageIds,
         trigger_words: triggerWords,
         auto_send_enabled: document.getElementById('tp-auto-send').checked,
         auto_send_threshold: parseInt(document.getElementById('tp-threshold').value) || 10,

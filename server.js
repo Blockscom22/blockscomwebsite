@@ -788,7 +788,7 @@ app.get('/api/images', requireAuth, async (req, res) => {
   res.json({ images: data || [], limit, used: (data || []).length });
 });
 
-// API: Upload image
+// API: Upload image (single)
 app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
@@ -835,6 +835,59 @@ app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, 
   }
 });
 
+// API: Upload multiple images at once
+app.post('/api/images/upload-multiple', requireAuth, upload.array('images', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No image files provided.' });
+
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const role = req.user.profile.role || 'FREE';
+    const limit = IMAGE_LIMITS[role] || 3;
+    const { count, error: countErr } = await supabase.from('user_images').select('*', { count: 'exact', head: true }).eq('profile_id', req.user.id);
+    if (countErr) return res.status(500).json({ error: countErr.message });
+
+    const available = limit - (count || 0);
+    if (available <= 0) return res.status(403).json({ error: `Your ${role} tier is limited to ${limit} image(s). Please upgrade to upload more.` });
+
+    const filesToUpload = req.files.slice(0, available);
+    const uploaded = [];
+    const errors = [];
+
+    for (const file of filesToUpload) {
+      if (!allowed.includes(file.mimetype)) { errors.push(`${file.originalname}: invalid type`); continue; }
+      if (file.size > 5 * 1024 * 1024) { errors.push(`${file.originalname}: too large (max 5MB)`); continue; }
+
+      const ext = file.originalname.split('.').pop() || 'jpg';
+      const storagePath = `${req.user.id}/${crypto.randomUUID()}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage.from('user-images').upload(storagePath, file.buffer, {
+        contentType: file.mimetype, upsert: false
+      });
+      if (uploadErr) { errors.push(`${file.originalname}: ${uploadErr.message}`); continue; }
+
+      const { data: urlData } = supabase.storage.from('user-images').getPublicUrl(storagePath);
+      const publicUrl = urlData?.publicUrl || '';
+
+      const { data: img, error: insertErr } = await supabase.from('user_images').insert([{
+        profile_id: req.user.id,
+        file_name: file.originalname,
+        file_path: storagePath,
+        file_url: publicUrl,
+        file_size: file.size
+      }]).select().single();
+
+      if (insertErr) { errors.push(`${file.originalname}: ${insertErr.message}`); continue; }
+      uploaded.push(img);
+    }
+
+    const skipped = req.files.length - filesToUpload.length;
+    res.json({ success: true, uploaded, errors, skipped });
+  } catch (e) {
+    console.error('Multi-image upload error:', e.message);
+    res.status(500).json({ error: 'Upload failed.' });
+  }
+});
+
 // API: Delete image
 app.delete('/api/images/:id', requireAuth, async (req, res) => {
   try {
@@ -844,8 +897,8 @@ app.delete('/api/images/:id', requireAuth, async (req, res) => {
     // Delete from storage
     await supabase.storage.from('user-images').remove([img.file_path]);
 
-    // Delete linked trigger photos
-    await supabase.from('trigger_photos').delete().eq('image_id', req.params.id).eq('profile_id', req.user.id);
+    // Delete linked trigger photo images from junction table
+    await supabase.from('trigger_photo_images').delete().eq('image_id', req.params.id);
 
     // Delete metadata
     const { error } = await supabase.from('user_images').delete().eq('id', req.params.id).eq('profile_id', req.user.id);
@@ -856,45 +909,58 @@ app.delete('/api/images/:id', requireAuth, async (req, res) => {
 
 // ==================== TRIGGER PHOTOS ====================
 
-// API: List trigger photos (with image data)
+// API: List trigger photos (with image data via junction table)
 app.get('/api/trigger-photos', requireAuth, async (req, res) => {
-  const { data, error } = await supabase.from('trigger_photos').select('*, user_images(*)').eq('profile_id', req.user.id).order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('trigger_photos').select('*, trigger_photo_images(*, user_images(*))').eq('profile_id', req.user.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
 
-// API: Create or update trigger photo
+// API: Create or update trigger photo (supports multiple image_ids)
 app.post('/api/trigger-photos', requireAuth, async (req, res) => {
   try {
-    const { id, image_id, trigger_words, auto_send_enabled, auto_send_threshold, is_kb_skill } = req.body;
-    if (!image_id || !trigger_words) return res.status(400).json({ error: 'image_id and trigger_words are required.' });
+    const { id, image_ids, trigger_words, auto_send_enabled, auto_send_threshold, is_kb_skill } = req.body;
+    // Support both old single image_id and new image_ids array
+    let imageIdList = image_ids || [];
+    if (req.body.image_id && imageIdList.length === 0) imageIdList = [req.body.image_id];
+    if (imageIdList.length === 0 || !trigger_words) return res.status(400).json({ error: 'At least one image and trigger_words are required.' });
 
-    // Verify image belongs to user
-    const { data: img } = await supabase.from('user_images').select('id').eq('id', image_id).eq('profile_id', req.user.id).single();
-    if (!img) return res.status(404).json({ error: 'Image not found.' });
+    // Verify all images belong to user
+    const { data: imgs } = await supabase.from('user_images').select('id').in('id', imageIdList).eq('profile_id', req.user.id);
+    if (!imgs || imgs.length !== imageIdList.length) return res.status(404).json({ error: 'One or more images not found.' });
 
+    let triggerPhotoId = id;
     if (id) {
       // Update
       const { error } = await supabase.from('trigger_photos').update({
-        image_id, trigger_words, auto_send_enabled: !!auto_send_enabled,
+        trigger_words, auto_send_enabled: !!auto_send_enabled,
         auto_send_threshold: auto_send_threshold || null, is_kb_skill: !!is_kb_skill
       }).eq('id', id).eq('profile_id', req.user.id);
       if (error) return res.status(500).json({ error: error.message });
     } else {
       // Insert
-      const { error } = await supabase.from('trigger_photos').insert([{
-        profile_id: req.user.id, image_id, trigger_words,
+      const { data: newTp, error } = await supabase.from('trigger_photos').insert([{
+        profile_id: req.user.id, trigger_words,
         auto_send_enabled: !!auto_send_enabled,
         auto_send_threshold: auto_send_threshold || null,
         is_kb_skill: !!is_kb_skill
-      }]);
+      }]).select().single();
       if (error) return res.status(500).json({ error: error.message });
+      triggerPhotoId = newTp.id;
     }
+
+    // Sync junction table: delete old links, insert new ones
+    await supabase.from('trigger_photo_images').delete().eq('trigger_photo_id', triggerPhotoId);
+    const junctionInserts = imageIdList.map((imgId, idx) => ({
+      trigger_photo_id: triggerPhotoId, image_id: imgId, sort_order: idx
+    }));
+    const { error: junctionErr } = await supabase.from('trigger_photo_images').insert(junctionInserts);
+    if (junctionErr) return res.status(500).json({ error: junctionErr.message });
 
     // If is_kb_skill, sync to KB
     if (is_kb_skill) {
       const kbTitle = `Trigger Photo: ${trigger_words.split(',')[0].trim()}`;
-      const kbContent = `# Trigger Photo\n\nThis is a trigger photo that should be sent when the user says any of the following:\n${trigger_words.split(',').map(w => '- "' + w.trim() + '"').join('\n')}\n\n${auto_send_enabled ? `Auto-send is enabled after ${auto_send_threshold || 10} messages.` : ''}`;
+      const kbContent = `# Trigger Photo\n\nThis is a trigger photo that should be sent when the user says any of the following:\n${trigger_words.split(',').map(w => '- "' + w.trim() + '"').join('\n')}\n\n${imageIdList.length} image(s) attached.\n\n${auto_send_enabled ? `Auto-send is enabled after ${auto_send_threshold || 10} messages.` : ''}`;
 
       const { data: existing } = await supabase.from('knowledge_entries').select('id').eq('profile_id', req.user.id).eq('title', kbTitle).single();
       if (existing) {
@@ -1608,6 +1674,52 @@ async function processMessage(event, fbPageId) {
       }
     );
     debugLog(`[DEBUG] Facebook API status: ${fbRes.status}`);
+
+    // 5b. Check trigger photos — send matching images
+    try {
+      const { data: triggerPhotos } = await supabase
+        .from('trigger_photos')
+        .select('*, trigger_photo_images(*, user_images(*))')
+        .eq('profile_id', page.profile_id);
+
+      if (triggerPhotos && triggerPhotos.length > 0 && messageText) {
+        const msgLower = messageText.toLowerCase();
+        for (const tp of triggerPhotos) {
+          const words = (tp.trigger_words || '').split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
+          const matched = words.some(w => msgLower.includes(w));
+          if (matched && tp.trigger_photo_images && tp.trigger_photo_images.length > 0) {
+            debugLog(`[DEBUG] Trigger photo matched: "${tp.trigger_words}"`);
+            // Sort by sort_order and send each image
+            const sortedImages = tp.trigger_photo_images
+              .filter(tpi => tpi.user_images && tpi.user_images.file_url)
+              .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+            for (const tpi of sortedImages) {
+              try {
+                await axios.post(
+                  `https://graph.facebook.com/v22.0/me/messages`,
+                  {
+                    recipient: { id: senderId },
+                    message: {
+                      attachment: {
+                        type: 'image',
+                        payload: { url: tpi.user_images.file_url, is_reusable: true }
+                      }
+                    }
+                  },
+                  { params: { access_token: pageAccessToken } }
+                );
+                debugLog(`[DEBUG] Sent trigger image: ${tpi.user_images.file_name}`);
+              } catch (imgErr) {
+                console.error(`[ERROR] Failed to send trigger image ${tpi.user_images.file_name}:`, imgErr.message);
+              }
+            }
+          }
+        }
+      }
+    } catch (triggerErr) {
+      console.error('[WARN] Trigger photo check failed:', triggerErr.message);
+    }
 
     // 6. Log & Deduct Credits
     await supabase.from('activity_logs').insert([{
