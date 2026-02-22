@@ -405,6 +405,18 @@
         padding: 20px;
         border-radius: 16px;
       }
+
+      /* KB header buttons stack on mobile */
+      #view-kb .header>div:last-child {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+
+      #view-kb .header>div:last-child .btn {
+        flex: 1 1 100%;
+        text-align: center;
+        justify-content: center;
+      }
     }
 
     /* Mobile automation card fixes */
@@ -1539,9 +1551,8 @@
         } catch (e) { }
       }
 
-      // Get URL params for view routing
       const urlParams = new URLSearchParams(window.location.search);
-      const viewToLoad = urlParams.get('view') || 'pages';
+      const viewToLoad = urlParams.get('view') || localStorage.getItem('blockscom_active_view') || 'pages';
 
       // Render structure instantly, start background tasks
       showView(viewToLoad);
@@ -1931,12 +1942,15 @@
     }
 
     function showView(view) {
+      // Close sidebar on mobile after selecting a page
+      document.querySelector('.sidebar').classList.remove('open');
       // Guard: only ADMIN can access the admin view
       if (view === 'admin' && (!me || me.role !== 'ADMIN')) {
         view = 'pages';
       }
       document.querySelectorAll('.view-section').forEach(d => d.style.display = 'none');
       document.getElementById('view-' + view).style.display = 'block';
+      localStorage.setItem('blockscom_active_view', view);
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       const navId = view === 'admin' ? 'admin-nav' : view === 'admin-logs' ? 'admin-logs-nav' : 'nav-' + view;
       const nav = document.getElementById(navId);
