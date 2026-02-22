@@ -492,84 +492,195 @@ app.post('/api/kb/import', requireAuth, async (req, res) => {
   }
 });
 
-// API: Import Products from File via AI
-app.post('/api/products/import', requireAuth, async (req, res) => {
+// ==================== FLEXIBLE INVENTORY SYSTEM ====================
+
+// Helper: role-based spreadsheet limits
+const TABLE_LIMITS = { FREE: 1, PREMIUM: 10, ENTERPRISE: 999999, ADMIN: 999999 };
+
+// Helper: sync an inventory table to its auto-generated KB entry
+async function syncInventoryToKb(profileId, tableId) {
+  try {
+    const { data: table } = await supabase.from('inventory_tables').select('*').eq('id', tableId).single();
+    if (!table) return;
+    const { data: rows } = await supabase.from('inventory_rows').select('*').eq('table_id', tableId).order('created_at');
+    const columns = table.columns || [];
+    const kbTitle = `Inventory: ${table.name}`;
+    let md = `# ${table.name}\n\n`;
+    if (columns.length > 0) {
+      md += '| ' + columns.map(c => c.label).join(' | ') + ' |\n';
+      md += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
+      (rows || []).forEach(r => {
+        md += '| ' + columns.map(c => String(r.data[c.key] ?? '')).join(' | ') + ' |\n';
+      });
+    }
+    md += `\n<!-- DATA_JSON -->\n\`\`\`json\n${JSON.stringify({ columns, rows: (rows || []).map(r => r.data) }, null, 2)}\n\`\`\`\n<!-- /DATA_JSON -->`;
+    // Upsert KB entry
+    const { data: existing } = await supabase.from('knowledge_entries').select('id').eq('profile_id', profileId).eq('title', kbTitle).single();
+    if (existing) {
+      await supabase.from('knowledge_entries').update({ content: md }).eq('id', existing.id);
+    } else {
+      await supabase.from('knowledge_entries').insert([{ profile_id: profileId, title: kbTitle, content: md }]);
+    }
+  } catch (e) { console.error('syncInventoryToKb error:', e.message); }
+}
+
+// API: List user's inventory tables
+app.get('/api/inventory/tables', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('inventory_tables').select('*').eq('profile_id', req.user.id).order('created_at');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+// API: Create or update an inventory table
+app.post('/api/inventory/tables', requireAuth, async (req, res) => {
+  try {
+    const { id, name, columns } = req.body;
+    if (!name || !columns || !Array.isArray(columns)) return res.status(400).json({ error: 'name and columns required' });
+    if (name.length > 100) return res.status(400).json({ error: 'Table name too long (max 100)' });
+    if (columns.length > 20) return res.status(400).json({ error: 'Too many columns (max 20)' });
+
+    if (id) {
+      // Update existing
+      const { data, error } = await supabase.from('inventory_tables').update({ name, columns }).eq('id', id).eq('profile_id', req.user.id).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      await syncInventoryToKb(req.user.id, id);
+      return res.json(data);
+    }
+
+    // Create new — check limits
+    const role = req.user.profile.role || 'FREE';
+    const limit = TABLE_LIMITS[role] || 1;
+    const { count } = await supabase.from('inventory_tables').select('*', { count: 'exact', head: true }).eq('profile_id', req.user.id);
+    if (count >= limit) return res.status(403).json({ error: `Your ${role} tier is limited to ${limit} spreadsheet(s). Please upgrade.` });
+
+    const { data, error } = await supabase.from('inventory_tables').insert([{ profile_id: req.user.id, name, columns }]).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    // Auto-create KB entry
+    await syncInventoryToKb(req.user.id, data.id);
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API: Delete an inventory table (cascades rows, removes KB)
+app.delete('/api/inventory/tables/:id', requireAuth, async (req, res) => {
+  try {
+    const { data: table } = await supabase.from('inventory_tables').select('name').eq('id', req.params.id).eq('profile_id', req.user.id).single();
+    if (!table) return res.status(404).json({ error: 'Not found' });
+    // Delete the table (CASCADE deletes rows)
+    const { error } = await supabase.from('inventory_tables').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    // Delete associated KB entry
+    await supabase.from('knowledge_entries').delete().eq('profile_id', req.user.id).eq('title', `Inventory: ${table.name}`);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API: Get rows for a table
+app.get('/api/inventory/tables/:id/rows', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('inventory_rows').select('*').eq('table_id', req.params.id).eq('profile_id', req.user.id).order('created_at');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+// API: Create or update a row
+app.post('/api/inventory/tables/:id/rows', requireAuth, async (req, res) => {
+  try {
+    const { rowId, data: rowData } = req.body;
+    if (!rowData || typeof rowData !== 'object') return res.status(400).json({ error: 'data required' });
+    if (rowId) {
+      const { data, error } = await supabase.from('inventory_rows').update({ data: rowData }).eq('id', rowId).eq('profile_id', req.user.id).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      await syncInventoryToKb(req.user.id, req.params.id);
+      return res.json(data);
+    }
+    const { data, error } = await supabase.from('inventory_rows').insert([{ table_id: req.params.id, profile_id: req.user.id, data: rowData }]).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await syncInventoryToKb(req.user.id, req.params.id);
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API: Bulk save rows (for inline editing)
+app.put('/api/inventory/tables/:id/rows', requireAuth, async (req, res) => {
+  try {
+    const { rows } = req.body; // [{ id?, data }]
+    if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows array required' });
+    for (const row of rows) {
+      if (row.id) {
+        await supabase.from('inventory_rows').update({ data: row.data }).eq('id', row.id).eq('profile_id', req.user.id);
+      } else {
+        await supabase.from('inventory_rows').insert([{ table_id: req.params.id, profile_id: req.user.id, data: row.data }]);
+      }
+    }
+    await syncInventoryToKb(req.user.id, req.params.id);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API: Delete a row
+app.delete('/api/inventory/rows/:id', requireAuth, async (req, res) => {
+  try {
+    const { data: row } = await supabase.from('inventory_rows').select('table_id').eq('id', req.params.id).eq('profile_id', req.user.id).single();
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    const { error } = await supabase.from('inventory_rows').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    await syncInventoryToKb(req.user.id, row.table_id);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API: Force sync inventory table to KB
+app.post('/api/inventory/tables/:id/sync', requireAuth, async (req, res) => {
+  await syncInventoryToKb(req.user.id, req.params.id);
+  res.json({ success: true });
+});
+
+// API: AI-powered import for a specific inventory table
+app.post('/api/inventory/tables/:id/import', requireAuth, async (req, res) => {
   try {
     const { fileData } = req.body;
     if (!fileData) return res.status(400).json({ error: 'No file data provided' });
-
-    // Use default OpenRouter key, fallback if not set
     const resolvedApiKey = process.env.OPENROUTER_API_KEY;
-    if (!resolvedApiKey) {
-      return res.status(500).json({ error: 'System OpenRouter API key not configured for bulk import.' });
-    }
+    if (!resolvedApiKey) return res.status(500).json({ error: 'OpenRouter API key not configured.' });
+
+    // Fetch the table's column definitions
+    const { data: table } = await supabase.from('inventory_tables').select('columns').eq('id', req.params.id).eq('profile_id', req.user.id).single();
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+    const colDefs = (table.columns || []).map(c => `"${c.key}" (${c.label}, type: ${c.type})`).join(', ');
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-4o', // Use a high-reasoning model for extraction
+      model: 'openai/gpt-4o',
       messages: [
         {
-          role: 'system',
-          content: `You are an inventory parsing assistant. The user will provide raw text or CSV content.
-Your job is to extract the product data and return a STRICT JSON array of objects.
+          role: 'system', content: `You are a data parsing assistant. Extract rows from raw text/CSV and return a STRICT JSON array.
 
-REQUIRED JSON FORMAT:
-[
-  {
-    "name": "Product Name",
-    "category": "Category Name",
-    "price": 10.99,
-    "stock_quantity": 100,
-    "is_sellable": true,
-    "is_active": true
-  }
-]
+The target table has these columns: ${colDefs}
 
-RULES:
-1. "price" must be a number (float/int).
-2. "stock_quantity" must be an integer.
-3. If "Sell by bot" or similar is mentioned as "SELLING" or true, set "is_sellable": true. If "DEACTIVATE" or false, set "is_sellable": false. Default to true if not specified.
-4. "is_active" should default to true.
-5. Do NOT wrap the JSON in markdown blocks (no \`\`\`json). Just return the raw JSON array.
-6. IF the input is completely unreadable, gibberish, or lacks clear product boundaries, DO NOT return an array. Instead, return exactly this JSON object:
-{"error": true, "message": "Invalid file format. Please use a default format like: Product Name, Category, Price, Stock, Sell by bot (SELLING OR DEACTIVATE)"}
-`
-        },
-        { role: 'user', content: String(fileData).substring(0, 10000) } // Prevent massive payloads
+Return format: [ { "${(table.columns[0] || { key: 'col_1' }).key}": value, ... }, ... ]
+Rules:
+1. Match data to the closest column by meaning.
+2. number types must be numeric. boolean types must be true/false.
+3. Do NOT wrap in markdown. Return raw JSON array only.
+4. If unreadable, return: {"error": true, "message": "Could not parse the data."}` },
+        { role: 'user', content: String(fileData).substring(0, 10000) }
       ]
-    }, {
-      headers: {
-        'Authorization': `Bearer ${resolvedApiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://www.blockscom.xyz',
-        'X-Title': 'Blockscom AI'
-      }
-    });
+    }, { headers: { 'Authorization': `Bearer ${resolvedApiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://www.blockscom.xyz', 'X-Title': 'Blockscom AI' } });
 
-    const reply = aiRes.data?.choices?.[0]?.message?.content?.trim() || '';
+    let reply = aiRes.data?.choices?.[0]?.message?.content?.trim() || '';
+    if (reply.startsWith('```')) reply = reply.replace(/^```json?/i, '').replace(/```$/, '').trim();
+    const parsed = JSON.parse(reply);
+    if (parsed.error) return res.status(400).json(parsed);
+    if (!Array.isArray(parsed)) throw new Error('AI did not return a valid array.');
 
-    // Clean up potential markdown wrappers just in case the AI disobeys
-    let cleanJson = reply;
-    if (cleanJson.startsWith('\`\`\`json')) {
-      cleanJson = cleanJson.replace(/^\`\`\`json/i, '').replace(/\`\`\`$/, '').trim();
-    } else if (cleanJson.startsWith('\`\`\`')) {
-      cleanJson = cleanJson.replace(/^\`\`\`/i, '').replace(/\`\`\`$/, '').trim();
-    }
-
-    const parsed = JSON.parse(cleanJson);
-
-    if (parsed.error) {
-      return res.status(400).json(parsed); // Send the specific AI fallback error
-    }
-
-    if (!Array.isArray(parsed)) {
-      throw new Error("AI did not return a valid array.");
-    }
-
-    res.json({ success: true, products: parsed });
-
+    // Insert rows
+    const inserts = parsed.map(row => ({ table_id: req.params.id, profile_id: req.user.id, data: row }));
+    const { error: insertErr } = await supabase.from('inventory_rows').insert(inserts);
+    if (insertErr) throw new Error(insertErr.message);
+    await syncInventoryToKb(req.user.id, req.params.id);
+    res.json({ success: true, imported: parsed.length });
   } catch (error) {
-    console.error('Import API Error:', error.message);
-    res.status(500).json({ error: 'Failed to process file. Ensure it loosely follows the required format.' });
+    console.error('Inventory Import Error:', error.message);
+    res.status(500).json({ error: 'Failed to process file.' });
   }
 });
 
@@ -827,18 +938,25 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
       .eq('profile_id', page.profile_id);
     const context = (kb || []).map(k => k.content).join('\n\n');
 
-    // Fetch Products for Widget
-    const { data: products } = await supabase
-      .from('products')
-      .select('*')
-      .eq('profile_id', page.profile_id)
-      .eq('is_active', true);
+    // Fetch Inventory Data for Widget
+    const { data: invTables } = await supabase
+      .from('inventory_tables')
+      .select('id, name, columns')
+      .eq('profile_id', page.profile_id);
 
     let productCatalog = "";
-    if (products && products.length > 0) {
-      productCatalog = "\n\nPRODUCT CATALOG:\n" + products.map(p =>
-        `- ${p.name}: ${p.description} (Price: $${p.price}, Stock: ${p.stock_quantity})`
-      ).join('\n');
+    let widgetProducts = [];
+    if (invTables && invTables.length > 0) {
+      for (const tbl of invTables) {
+        const { data: invRows } = await supabase.from('inventory_rows').select('data').eq('table_id', tbl.id);
+        if (invRows && invRows.length > 0) {
+          const cols = tbl.columns || [];
+          productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
+            return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
+          }).join('\n');
+          widgetProducts = widgetProducts.concat(invRows.map(r => ({ _table: tbl.name, ...r.data })));
+        }
+      }
     }
 
     const resolvedApiKey = process.env.OPENROUTER_API_KEY;
@@ -941,7 +1059,7 @@ INSTRUCTIONS:
       }
     }
 
-    res.json({ ok: true, reply, products: products || [] });
+    res.json({ ok: true, reply, products: widgetProducts || [] });
   } catch (e) {
     res.status(500).json({ error: e.message || 'internal error' });
   }
@@ -1027,22 +1145,14 @@ async function processMessage(event, fbPageId) {
 
     // Filter by specific files if defined
     let kbTitles = [];
-    let selectedProducts = [];
-    let selectedCategories = [];
 
     if (Array.isArray(page.knowledge_base) && page.knowledge_base.length > 0) {
-      page.knowledge_base.forEach(item => {
-        if (item.startsWith('prod:')) selectedProducts.push(item.substring(5));
-        else if (item.startsWith('cat:')) selectedCategories.push(item.substring(4));
-        else kbTitles.push(item);
-      });
+      // All KB selections are now just skill titles (including auto-synced "Inventory: ..." entries)
+      kbTitles = page.knowledge_base.filter(item => typeof item === 'string');
 
       if (kbTitles.length > 0) {
         debugLog(`[DEBUG] Filtering KB by titles: ${kbTitles.join(', ')}`);
         kbQuery = kbQuery.in('title', kbTitles);
-      } else {
-        // If they ONLY selected products, we shouldn't fetch all KB, we should fetch none
-        kbQuery = kbQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Force empty
       }
     }
 
@@ -1051,35 +1161,26 @@ async function processMessage(event, fbPageId) {
     const context = (kb || []).map(k => k.content).join('\n\n');
     debugLog(`[DEBUG] KB Context length: ${context.length} characters.`);
 
-    // 3b. Fetch Product Catalog
-    debugLog(`[DEBUG] Fetching product catalog for user ${page.profile_id}...`);
-    let prodQuery = supabase
-      .from('products')
-      .select('*')
-      .eq('profile_id', page.profile_id)
-      .eq('is_active', true)
-      .eq('is_sellable', true); // Only fetch sellable products for AI
-
-    if (selectedProducts.length > 0 || selectedCategories.length > 0) {
-      debugLog(`[DEBUG] Filtering products: ${selectedProducts.length} specific, ${selectedCategories.length} categories`);
-      // We need an OR condition: name in selectedProducts OR category in selectedCategories
-      let orConditions = [];
-      if (selectedProducts.length > 0) orConditions.push(`name.in.("${selectedProducts.join('","')}")`);
-      if (selectedCategories.length > 0) orConditions.push(`category.in.("${selectedCategories.join('","')}")`);
-      prodQuery = prodQuery.or(orConditions.join(','));
-    }
-
-    const { data: products, error: prodError } = await prodQuery;
-
+    // 3b. Fetch Inventory Data from flexible tables
+    debugLog(`[DEBUG] Fetching inventory data for user ${page.profile_id}...`);
     let productCatalog = "";
-    if (prodError) {
-      console.warn(`[WARN] Products query failed (table might not exist yet):`, prodError.message);
-    } else if (products && products.length > 0) {
-      productCatalog = "\n\nPRODUCT CATALOG:\n" + products.map(p =>
-        `- ${p.name}: ${p.description} (Price: $${p.price}, Stock: ${p.stock_quantity})`
-      ).join('\n');
+    try {
+      const { data: invTables } = await supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id);
+      if (invTables && invTables.length > 0) {
+        for (const tbl of invTables) {
+          const { data: invRows } = await supabase.from('inventory_rows').select('data').eq('table_id', tbl.id);
+          if (invRows && invRows.length > 0) {
+            const cols = tbl.columns || [];
+            productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
+              return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
+            }).join('\n');
+          }
+        }
+      }
+    } catch (invErr) {
+      console.warn('[WARN] Inventory query failed:', invErr.message);
     }
-    debugLog(`[DEBUG] Product catalog items found: ${products?.length || 0}`);
+    debugLog(`[DEBUG] Inventory catalog length: ${productCatalog.length} chars`);
 
     // 4. Get AI Response
     debugLog(`[DEBUG] Requesting AI completion from OpenRouter (${page.ai_model || 'default'})...`);

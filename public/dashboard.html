@@ -755,54 +755,51 @@
       <div id="kb-list" class="grid"></div>
     </div>
 
-    <!-- View: Products -->
+    <!-- View: Inventory (Flexible Spreadsheets) -->
     <div id="view-products" class="view-section" style="display:none">
-      <div class="header">
-        <div>
-          <h1>Inventory System</h1>
-          <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Manage your inventory, auto-conversion
-            currency, and bot-selling status.</p>
+      <!-- Table List -->
+      <div id="inv-list-view">
+        <div class="header">
+          <div>
+            <h1>Inventory System</h1>
+            <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Create custom spreadsheets to organize
+              your products and inventory. Each auto-syncs to your AI knowledge base.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openInvTableModal()">+ New Spreadsheet</button>
         </div>
-        <div style="display:flex; gap:12px; align-items:center">
-          <button class="btn btn-secondary" onclick="exportProductsCSV()">⭳ Export (CSV)</button>
-          <button class="btn btn-secondary" onclick="document.getElementById('inventory-file').click()">⟳ Import
-            Files</button>
-          <input type="file" id="inventory-file" style="display:none" accept=".txt,.csv"
-            onchange="importInventory(event)">
-          <button class="btn btn-primary" onclick="openProductModal()">+ Add New Product</button>
-        </div>
+        <div id="inv-tables-list" class="grid"></div>
       </div>
-      <div class="card" style="padding:0; overflow:hidden">
-        <div class="table-responsive">
-          <table style="margin:0">
-            <thead>
-              <tr>
-                <th style="width: 70px; display: flex; align-items: center; gap: 4px; border-bottom: none;"><input
-                    type="checkbox" id="sync-chk-image" checked onchange="forceSyncProducts()" title="Sync Image"> Image
-                </th>
-                <th><label
-                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
-                      type="checkbox" id="sync-chk-name" checked onchange="forceSyncProducts()" title="Sync Name">
-                    Product Name</label></th>
-                <th><label
-                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
-                      type="checkbox" id="sync-chk-category" checked onchange="forceSyncProducts()"
-                      title="Sync Category"> Category</label></th>
-                <th id="price-th"><label
-                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
-                      type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price">
-                    Price (USD)</label></th>
-                <th><label
-                    style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input
-                      type="checkbox" id="sync-chk-stock" checked onchange="forceSyncProducts()" title="Sync Stock">
-                    Stock</label></th>
-                <th>Sell by Bot</th>
-                <th>Status</th>
-                <th style="text-align:right">Management</th>
-              </tr>
-            </thead>
-            <tbody id="products-table-body"></tbody>
-          </table>
+      <!-- Table Detail / Spreadsheet Edit -->
+      <div id="inv-detail-view" style="display:none">
+        <div class="header">
+          <div style="display:flex; align-items:center; gap:12px">
+            <button class="btn btn-secondary" onclick="closeInvDetail()" style="padding:8px 12px">← Back</button>
+            <div>
+              <h1 id="inv-detail-title">Spreadsheet</h1>
+              <p style="color:var(--text-dim); font-size:0.8rem; margin-top:2px" id="inv-detail-kb-link">Auto-synced to
+                KB</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:12px; align-items:center">
+            <button class="btn btn-secondary" onclick="exportInvCSV()">⭳ Export CSV</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('inv-import-file').click()">⟳
+              Import</button>
+            <input type="file" id="inv-import-file" style="display:none" accept=".txt,.csv"
+              onchange="importInvFile(event)">
+            <button class="btn btn-primary" onclick="addInvRow()">+ Add Row</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0; overflow:hidden">
+          <div class="table-responsive">
+            <table style="margin:0">
+              <thead id="inv-detail-thead"></thead>
+              <tbody id="inv-detail-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="margin-top:16px; display:flex; gap:12px">
+          <button class="btn btn-primary" onclick="saveInvRows()">💾 Save All Changes</button>
+          <button class="btn btn-secondary" onclick="syncInvTable()">⟳ Force Sync to KB</button>
         </div>
       </div>
     </div>
@@ -1037,13 +1034,11 @@
         </div>
 
         <div style="margin-top:20px">
-          <h3>Linked Products & Categories</h3>
-          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">Select which inventory items the AI can
-            recommend to users on this page.</p>
+          <h3>Linked Inventory Spreadsheets</h3>
+          <p style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">Select which inventory tables the AI can
+            reference on this page.</p>
           <div class="kb-selection-container">
-            <input type="text" class="kb-search-bar" placeholder="Search products & categories..."
-              onkeyup="filterProducts(this.value)">
-            <div id="product-selector-list" class="kb-selection-list"></div>
+            <div id="inv-table-selector-list" class="kb-selection-list"></div>
           </div>
         </div>
 
@@ -1135,72 +1130,27 @@
     </div>
   </div>
 
-  <!-- Modal: Product -->
-  <div class="modal-overlay" id="productModal">
+  <!-- Modal: Inventory Table Create/Edit -->
+  <div class="modal-overlay" id="invTableModal">
     <div class="modal">
-      <h2 id="productModalTitle" style="margin-bottom:8px">Product Entry</h2>
-      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:32px">Manage inventory details for your AI
-        storefront.</p>
-      <form onsubmit="event.preventDefault(); saveProduct();">
-        <input type="hidden" id="prod-id-hidden">
-        <label>Product Name</label><input id="prod-name" class="input" placeholder="e.g. Premium Subscription" required>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
-          <div><label>Category</label><input id="prod-category" class="input" placeholder="SaaS, E-commerce, etc.">
-          </div>
-          <div><label id="modal-price-label">Price (₱)</label><input type="number" step="0.01" id="prod-price"
-              class="input" placeholder="0.00" required></div>
+      <h2 id="invTableModalTitle" style="margin-bottom:8px">New Spreadsheet</h2>
+      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:24px">Define your columns — each spreadsheet
+        auto-syncs to a Knowledge Base skill.</p>
+      <input type="hidden" id="inv-tbl-id-hidden">
+      <label>Spreadsheet Name</label><input id="inv-tbl-name" class="input" placeholder="e.g. Electronics, Food Menu"
+        required>
+      <div style="margin-top:20px">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+          <label style="margin:0">Columns</label>
+          <button type="button" class="btn btn-secondary" style="padding:4px 12px; font-size:0.75rem"
+            onclick="addInvColumn()">+ Add Column</button>
         </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
-          <div><label>Stock Quantity</label><input type="number" id="prod-stock" class="input" placeholder="100"
-              required></div>
-          <div>
-            <label>Inventory Logic</label>
-            <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px">
-              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem">
-                <input type="checkbox" id="prod-sell-bot" style="width:18px; height:18px">
-                <span>Enable Bot Selling</span>
-              </label>
-              <select id="prod-active" class="input" style="margin:0; padding:10px">
-                <option value="true">Active & Visible</option>
-                <option value="false">Inactive/Draft</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <label>Product Image (Optimized to 256x256)</label>
-        <div id="image-drop-zone"
-          style="border: 2px dashed var(--border); border-radius: 12px; padding: 24px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: background 0.2s, border-color 0.2s; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
-          <input type="file" id="prod-image-file" accept="image/*"
-            style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;"
-            onchange="handleImageSelection(event)">
-          <div id="image-preview-container"
-            style="display: none; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border);">
-            <img id="image-preview" src="" style="width: 100%; height: 100%; object-fit: cover;">
-          </div>
-          <div id="image-drop-text">
-            <div><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-dim); margin-bottom: 4px;">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg></div>
-            <span style="font-size: 0.85rem; color: var(--text); font-weight: 500;">Drag & Drop an image here</span>
-            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">or click to browse. Max 5MB
-              (auto-compressed).</div>
-          </div>
-        </div>
-        <input type="hidden" id="prod-image-url">
-
-        <label>Product Description (AI Context)</label>
-        <textarea id="prod-description" class="input" style="min-height:120px"
-          placeholder="Describe the product for the AI bot..."></textarea>
-
-        <div style="display:flex; gap:12px; margin-top:32px">
-          <button type="submit" class="btn btn-primary" style="flex:1">Save Product Information</button>
-          <button type="button" class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button>
-        </div>
-      </form>
+        <div id="inv-columns-list" style="display:flex; flex-direction:column; gap:8px"></div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:32px">
+        <button class="btn btn-primary" style="flex:1" onclick="saveInvTable()">Save Spreadsheet</button>
+        <button class="btn btn-secondary" onclick="closeModal('invTableModal')">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -1294,7 +1244,6 @@
 
     async function updateCurrency() {
       displayCurrency = document.getElementById('currency-selector').value;
-      document.getElementById('price-th').innerHTML = `<label style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price"> Price (${displayCurrency})</label>`;
 
       // Save to database
       try {
@@ -1311,27 +1260,8 @@
       }
 
       await loadRates();
-      await loadProducts();
-      await syncProductsToKb(); // Sync with new currency labels
     }
     let pagesCache = [];
-
-    async function syncProductsToKb() {
-      try {
-        const { data: products } = await sb.from('products').select('*').eq('profile_id', me.id);
-        if (products) {
-          await updateInventoryKb(products);
-        }
-      } catch (e) {
-        console.error("syncProductsToKb failed", e);
-      }
-    }
-
-    async function forceSyncProducts() {
-      await syncProductsToKb();
-      alert('Product Catalog synced successfully!');
-      await loadKb();
-    }
 
     async function updateSnippetTheme(pageId, widgetKey, theme) {
       const codeEl = document.getElementById('snippet-code-' + pageId);
@@ -1407,14 +1337,14 @@
           }
 
           await loadRates();
-          document.getElementById('price-th').innerHTML = `<label style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price"> Price (${displayCurrency})</label>`;
 
-          syncProductsToKb();
-
-          // Listen for inventory changes to make it instantly live
-          sb.channel('public:products')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'products', filter: `profile_id=eq.${me.id}` }, payload => {
-              loadProducts();
+          // Listen for inventory table changes
+          sb.channel('public:inventory_rows')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_rows', filter: `profile_id=eq.${me.id}` }, payload => {
+              // Refresh detail view if open
+              if (document.getElementById('inv-detail-view').style.display !== 'none' && currentInvTableId) {
+                openInvDetail(currentInvTableId);
+              }
             })
             .subscribe();
         })
@@ -1781,358 +1711,303 @@
       if (view === 'kb') loadKb();
       if (view === 'logs') loadLogs();
       if (view === 'pages') loadPages();
-      if (view === 'products') loadProducts();
+      if (view === 'products') loadInvTables();
     }
 
-    async function loadProducts() {
-      // Load products directly from the SQL `products` table
-      let products = [];
+    // ==================== FLEXIBLE INVENTORY SYSTEM JS ====================
+    let invTablesCache = [];
+    let currentInvTableId = null;
+    let currentInvTableData = null;
+
+    async function loadInvTables() {
       try {
-        const { data, error } = await sb.from('products').select('*').eq('profile_id', me.id).order('created_at', { ascending: false });
-        if (!error && data) {
-          products = data;
-        }
-      } catch (e) { console.error("Failed to load products from DB", e); }
+        const res = await fetch('/api/inventory/tables', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        invTablesCache = await res.json();
+      } catch (e) { invTablesCache = []; }
 
-      // We maintain the legacy synced product kb just in case the AI needs it that way
-      await syncProductsToKb();
-
-      const tbody = document.getElementById('products-table-body');
-      if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No products found. Inventory is empty.</td></tr>';
+      const role = me?.role || 'FREE';
+      const limits = { FREE: 1, PREMIUM: 10, ENTERPRISE: '∞', ADMIN: '∞' };
+      const list = document.getElementById('inv-tables-list');
+      if (invTablesCache.length === 0) {
+        list.innerHTML = `<div class="card" style="padding:40px; text-align:center">
+          <p style="color:var(--text-dim)">No spreadsheets yet. Create one to get started!</p>
+          <p style="font-size:0.8rem; color:var(--text-dim); margin-top:8px">Your tier (${role}) allows up to <strong>${limits[role] || 1}</strong> spreadsheet(s).</p>
+        </div>`;
         return;
       }
-      // Assuming 'is_sellable' was the legacy name, the table uses 'is_sellable'.
-      // If the schema differs, map it appropriately or update the UI schema. 
-      // Based on SCHEMA.sql, there is no is_sellable. We'll add it logic or default to is_active if missing
-      tbody.innerHTML = products.map(p => `
-        <tr>
-          <td>
-            <div style="width: 40px; height: 40px; border-radius: 6px; background: var(--surface-elevated); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border);">
-              ${p.image_url ? `<img src="${encodeURI(p.image_url)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.outerHTML='<span style=\\'font-size: 10px; color: var(--text-dim)\\'>No Img</span>'">` : '<span style="font-size: 10px; color: var(--text-dim)">No Img</span>'}
+      list.innerHTML = invTablesCache.map(t => {
+        const cols = (t.columns || []).map(c => c.label).join(', ');
+        return `<div class="card" style="cursor:pointer" onclick="openInvDetail('${t.id}')">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start">
+            <div>
+              <h3 style="margin:0 0 6px 0">${escapeHtml(t.name)}</h3>
+              <p style="font-size:0.8rem; color:var(--text-dim); margin:0">Columns: ${escapeHtml(cols) || 'None'}</p>
+              <p style="font-size:0.7rem; color:var(--text-dim); margin:4px 0 0 0">KB: Inventory: ${escapeHtml(t.name)}</p>
             </div>
-          </td>
-          <td><div style="font-weight:600">${escapeHtml(p.name)}</div><div style="font-size:0.7rem; color:var(--text-dim); max-width:200px; overflow:hidden; text-overflow:ellipsis">${escapeHtml(p.description || '')}</div></td>
-          <td><span class="badge badge-free">${escapeHtml(p.category || 'N/A')}</span></td>
-          <td style="font-weight:700">${formatPrice(p.price)}</td>
-          <td>${p.stock_quantity}</td>
-          <td><span class="badge ${p.is_sellable ? 'badge-premium' : 'badge-free'}">${p.is_sellable ? 'Selling' : 'Manual'}</span></td>
-          <td><span class="badge ${p.is_active ? 'badge-premium' : 'badge-free'}">${p.is_active ? 'Active' : 'Draft'}</span></td>
-          <td style="text-align:right">
-            <div style="display:flex; gap:8px; justify-content:flex-end">
-              <button class="btn btn-secondary" style="padding:4px 12px; font-size:0.75rem" onclick="openProductModal('${p.id}')">Edit</button>
-              <button class="btn btn-danger" style="padding:4px 12px; font-size:0.75rem" onclick="deleteProduct('${p.id}')">Del</button>
+            <div style="display:flex; gap:8px">
+              <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem" onclick="event.stopPropagation(); openInvTableModal('${t.id}')">Edit</button>
+              <button class="btn btn-danger" style="padding:4px 10px; font-size:0.75rem" onclick="event.stopPropagation(); deleteInvTable('${t.id}')">Del</button>
             </div>
-          </td>
-        </tr>
-      `).join('');
+          </div>
+        </div>`;
+      }).join('');
     }
 
-    async function openProductModal(id = null) {
-      document.getElementById('productModalTitle').innerText = id !== null ? 'Edit Product' : 'New Product Entry';
-      document.getElementById('modal-price-label').innerText = `Price (${displayCurrency})`;
-      document.getElementById('prod-id-hidden').value = id !== null ? id : '';
-      document.getElementById('prod-name').value = '';
-      document.getElementById('prod-category').value = '';
-      document.getElementById('prod-price').value = '';
-      document.getElementById('prod-stock').value = '';
-      document.getElementById('prod-active').value = 'true';
-      document.getElementById('prod-sell-bot').checked = true;
-      document.getElementById('prod-description').value = '';
-      document.getElementById('prod-image-url').value = '';
+    async function openInvDetail(tableId) {
+      currentInvTableId = tableId;
+      const t = invTablesCache.find(x => x.id === tableId);
+      if (!t) return;
+      currentInvTableData = t;
+      document.getElementById('inv-list-view').style.display = 'none';
+      document.getElementById('inv-detail-view').style.display = 'block';
+      document.getElementById('inv-detail-title').innerText = t.name;
+      document.getElementById('inv-detail-kb-link').innerText = `Auto-synced → KB: "Inventory: ${t.name}"`;
 
-      // Reset Image UI
-      document.getElementById('image-preview-container').style.display = 'none';
-      document.getElementById('image-drop-text').style.display = 'block';
-      document.getElementById('image-preview').src = '';
-      document.getElementById('prod-image-file').value = '';
+      const cols = t.columns || [];
+      document.getElementById('inv-detail-thead').innerHTML = `<tr>${cols.map(c => `<th>${escapeHtml(c.label)}</th>`).join('')}<th style="text-align:right; width:80px">Actions</th></tr>`;
 
-      if (id !== null) {
-        const { data, error } = await sb.from('products').select('*').eq('id', id).single();
-        if (data && !error) {
-          document.getElementById('prod-name').value = data.name;
-          document.getElementById('prod-category').value = data.category;
-          document.getElementById('prod-price').value = data.price;
-          document.getElementById('prod-stock').value = data.stock_quantity;
-          document.getElementById('prod-active').value = String(data.is_active);
-          document.getElementById('prod-sell-bot').checked = data.hasOwnProperty('is_sellable') ? !!data.is_sellable : true;
-          document.getElementById('prod-description').value = data.description || '';
-          document.getElementById('prod-image-url').value = data.image_url || '';
-
-          if (data.image_url) {
-            document.getElementById('image-preview-container').style.display = 'block';
-            document.getElementById('image-drop-text').style.display = 'none';
-            document.getElementById('image-preview').src = data.image_url;
-          }
-        }
-      }
-      document.getElementById('productModal').style.display = 'flex';
-    }
-
-    // Drag and Drop & Image Optimization
-    const dropZone = document.getElementById('image-drop-zone');
-
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--primary)', false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--border)', false);
-    });
-
-    dropZone.addEventListener('drop', handleDrop, false);
-
-    function handleDrop(e) {
-      const dt = e.dataTransfer;
-      const files = dt.files;
-      if (files && files.length > 0) {
-        processImageFile(files[0]);
-      }
-    }
-
-    function handleImageSelection(e) {
-      if (e.target.files && e.target.files.length > 0) {
-        processImageFile(e.target.files[0]);
-      }
-    }
-
-    function processImageFile(file) {
-      if (!file.type.match('image.*')) {
-        alert("Please only drop image files (JPG, PNG, WebP).");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          // Setup 256x256 target canvas
-          const TARGET_SIZE = 256;
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = TARGET_SIZE;
-          canvas.height = TARGET_SIZE;
-
-          // Calculate aspect ratio crop (Cover)
-          const scale = Math.max(TARGET_SIZE / img.width, TARGET_SIZE / img.height);
-          const x = (TARGET_SIZE / scale - img.width) / 2;
-          const y = (TARGET_SIZE / scale - img.height) / 2;
-
-          ctx.drawImage(img, x, y, img.width, img.height, 0, 0, TARGET_SIZE, TARGET_SIZE);
-
-          // Generate ultra-compressed WebP string, fallback to JPEG
-          const dataUrl = canvas.toDataURL('image/webp', 0.8);
-
-          document.getElementById('prod-image-url').value = dataUrl;
-          document.getElementById('image-preview').src = dataUrl;
-          document.getElementById('image-preview-container').style.display = 'block';
-          document.getElementById('image-drop-text').style.display = 'none';
-        }
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-
-    async function saveProduct() {
-      const id = document.getElementById('prod-id-hidden').value;
-      const newItem = {
-        profile_id: me.id,
-        name: document.getElementById('prod-name').value,
-        category: document.getElementById('prod-category').value,
-        price: parseFloat(document.getElementById('prod-price').value),
-        stock_quantity: parseInt(document.getElementById('prod-stock').value),
-        is_active: document.getElementById('prod-active').value === 'true',
-        is_sellable: document.getElementById('prod-sell-bot').checked,
-        description: document.getElementById('prod-description').value,
-        image_url: document.getElementById('prod-image-url').value
-      };
-
+      // Fetch rows
       try {
-        if (id) {
-          const { error } = await sb.from('products').update(newItem).eq('id', id);
-          if (error) throw error;
-        } else {
-          // Verify limits before inserting NEW product
-          const { count, error: countErr } = await sb.from('products').select('*', { count: 'exact', head: true }).eq('profile_id', me.id);
-          if (countErr) throw countErr;
+        const res = await fetch(`/api/inventory/tables/${tableId}/rows`, { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        const rows = await res.json();
+        renderInvRows(cols, rows);
+      } catch (e) { console.error(e); }
+    }
 
-          if (me.role === 'FREE' && count >= 2) {
-            alert('FREE tier users are limited to 2 products. Please upgrade to add more.');
-            return;
-          }
-          if (me.role !== 'FREE' && me.role !== 'ADMIN' && count >= 100) {
-            alert('Your current tier is limited to 100 products. Please contact support to increase limits.');
-            return;
-          }
-
-          const { error } = await sb.from('products').insert([newItem]);
-          if (error) throw error;
-        }
-      } catch (err) {
-        alert('Error saving product: ' + err.message);
+    function renderInvRows(cols, rows) {
+      const tbody = document.getElementById('inv-detail-tbody');
+      if (!rows || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${cols.length + 1}" class="empty-state">No rows yet. Click "+ Add Row" to start.</td></tr>`;
         return;
       }
-
-      await syncProductsToKb();
-      closeModal('productModal');
-      await loadProducts();
-    }
-
-    async function deleteProduct(id) {
-      if (!confirm('Delete this product?')) return;
-      const { error } = await sb.from('products').delete().eq('id', id);
-      if (error) {
-        alert('Failed to delete product: ' + error.message);
-      } else {
-        await syncProductsToKb();
-        await loadProducts();
-      }
-    }
-
-    async function importInventory(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      const importBtn = document.querySelector('button[onclick*="inventory-file"]');
-      const originalText = importBtn.innerText;
-      importBtn.innerText = '⟳ Importing...';
-      importBtn.disabled = true;
-
-      reader.onload = async (e) => {
-        const textContext = e.target.result;
-        try {
-          const res = await fetch('/api/products/import', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${currentSession.access_token}`
-            },
-            body: JSON.stringify({ fileData: textContext })
-          });
-
-          const result = await res.json();
-          if (!res.ok || result.error) {
-            alert(`Import Failed: \n\n${result.message || result.error}\n\nPlease use a simple default format like: Product Name, Category, Price, Stock, Sell by bot(SELLING OR DEACTIVATE)`);
-            return;
+      tbody.innerHTML = rows.map(r => {
+        const cells = cols.map(c => {
+          const val = r.data[c.key] ?? '';
+          if (c.type === 'boolean') {
+            return `<td><input type="checkbox" data-row="${r.id}" data-col="${c.key}" ${val ? 'checked' : ''}></td>`;
           }
+          return `<td><input class="input" style="margin:0; padding:6px 8px; font-size:0.85rem" data-row="${r.id}" data-col="${c.key}" type="${c.type === 'number' ? 'number' : 'text'}" value="${escapeHtml(String(val))}"></td>`;
+        }).join('');
+        return `<tr>${cells}<td style="text-align:right"><button class="btn btn-danger" style="padding:4px 8px; font-size:0.7rem" onclick="deleteInvRow('${r.id}')">✕</button></td></tr>`;
+      }).join('');
+    }
 
-          if (result.products && result.products.length > 0) {
-            const payload = result.products.map(p => ({
-              ...p,
-              profile_id: me.id
-            }));
+    function addInvRow() {
+      if (!currentInvTableData) return;
+      const cols = currentInvTableData.columns || [];
+      const tbody = document.getElementById('inv-detail-tbody');
+      // Check if showing empty state
+      if (tbody.querySelector('.empty-state')) tbody.innerHTML = '';
+      const cells = cols.map(c => {
+        if (c.type === 'boolean') {
+          return `<td><input type="checkbox" data-row="new" data-col="${c.key}"></td>`;
+        }
+        return `<td><input class="input" style="margin:0; padding:6px 8px; font-size:0.85rem" data-row="new" data-col="${c.key}" type="${c.type === 'number' ? 'number' : 'text'}" value=""></td>`;
+      }).join('');
+      tbody.insertAdjacentHTML('beforeend', `<tr>${cells}<td style="text-align:right"><button class="btn btn-danger" style="padding:4px 8px; font-size:0.7rem" onclick="this.closest('tr').remove()">✕</button></td></tr>`);
+    }
 
-            // Insert into the SQL table
-            const { error: insertErr } = await sb.from('products').insert(payload);
-            if (insertErr) throw new Error(insertErr.message);
-
-            await syncProductsToKb();
-            await loadProducts();
-            alert(`Successfully imported ${result.products.length} products!`);
+    async function saveInvRows() {
+      if (!currentInvTableId || !currentInvTableData) return;
+      const cols = currentInvTableData.columns || [];
+      const tbody = document.getElementById('inv-detail-tbody');
+      const trElements = tbody.querySelectorAll('tr');
+      const rows = [];
+      trElements.forEach(tr => {
+        if (tr.querySelector('.empty-state')) return;
+        const inputs = tr.querySelectorAll('input[data-col]');
+        if (inputs.length === 0) return;
+        const rowId = inputs[0].getAttribute('data-row');
+        const data = {};
+        inputs.forEach(inp => {
+          const col = inp.getAttribute('data-col');
+          const colDef = cols.find(c => c.key === col);
+          if (inp.type === 'checkbox') {
+            data[col] = inp.checked;
+          } else if (colDef && colDef.type === 'number') {
+            data[col] = parseFloat(inp.value) || 0;
           } else {
-            alert('No valid products found in the file.');
+            data[col] = inp.value;
           }
+        });
+        rows.push({ id: rowId === 'new' ? undefined : rowId, data });
+      });
 
-        } catch (error) {
-          alert('Import Error: ' + error.message);
-        } finally {
-          importBtn.innerText = originalText;
-          importBtn.disabled = false;
-          event.target.value = ''; // Reset file input
+      try {
+        await fetch(`/api/inventory/tables/${currentInvTableId}/rows`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+          body: JSON.stringify({ rows })
+        });
+        alert('All changes saved & synced to KB!');
+        await openInvDetail(currentInvTableId);
+      } catch (e) { alert('Error saving: ' + e.message); }
+    }
+
+    async function deleteInvRow(rowId) {
+      if (!confirm('Delete this row?')) return;
+      try {
+        await fetch(`/api/inventory/rows/${rowId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        await openInvDetail(currentInvTableId);
+      } catch (e) { alert('Delete failed: ' + e.message); }
+    }
+
+    async function deleteInvTable(id) {
+      if (!confirm('Delete this entire spreadsheet? All rows and the auto-KB entry will be removed.')) return;
+      try {
+        await fetch(`/api/inventory/tables/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        await loadInvTables();
+      } catch (e) { alert('Delete failed: ' + e.message); }
+    }
+
+    function closeInvDetail() {
+      document.getElementById('inv-detail-view').style.display = 'none';
+      document.getElementById('inv-list-view').style.display = 'block';
+      currentInvTableId = null;
+      currentInvTableData = null;
+      loadInvTables();
+    }
+
+    async function syncInvTable() {
+      if (!currentInvTableId) return;
+      try {
+        await fetch(`/api/inventory/tables/${currentInvTableId}/sync`, { method: 'POST', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        alert('Synced to Knowledge Base!');
+      } catch (e) { alert('Sync failed: ' + e.message); }
+    }
+
+    // Column Manager for Table Modal
+    let invColumnCounter = 0;
+
+    function openInvTableModal(editId = null) {
+      invColumnCounter = 0;
+      document.getElementById('inv-tbl-id-hidden').value = editId || '';
+      document.getElementById('inv-tbl-name').value = '';
+      document.getElementById('inv-columns-list').innerHTML = '';
+      document.getElementById('invTableModalTitle').innerText = editId ? 'Edit Spreadsheet' : 'New Spreadsheet';
+
+      if (editId) {
+        const t = invTablesCache.find(x => x.id === editId);
+        if (t) {
+          document.getElementById('inv-tbl-name').value = t.name;
+          (t.columns || []).forEach(c => addInvColumn(c));
         }
-      };
+      }
+      if (document.getElementById('inv-columns-list').children.length === 0) {
+        // Add default columns for new table
+        addInvColumn({ key: 'col_1', label: 'Product Name', type: 'text' });
+        addInvColumn({ key: 'col_2', label: 'Price', type: 'number' });
+        addInvColumn({ key: 'col_3', label: 'Stock', type: 'number' });
+      }
+      document.getElementById('invTableModal').style.display = 'flex';
+    }
 
+    function addInvColumn(preset = null) {
+      invColumnCounter++;
+      const key = preset?.key || `col_${Date.now()}_${invColumnCounter}`;
+      const label = preset?.label || '';
+      const type = preset?.type || 'text';
+      const el = document.createElement('div');
+      el.style.cssText = 'display:flex; gap:8px; align-items:center';
+      el.innerHTML = `
+        <input type="hidden" class="inv-col-key" value="${escapeHtml(key)}">
+        <input class="input inv-col-label" style="flex:2; margin:0; padding:8px" placeholder="Column name" value="${escapeHtml(label)}">
+        <select class="input inv-col-type" style="flex:1; margin:0; padding:8px">
+          <option value="text" ${type === 'text' ? 'selected' : ''}>Text</option>
+          <option value="number" ${type === 'number' ? 'selected' : ''}>Number</option>
+          <option value="boolean" ${type === 'boolean' ? 'selected' : ''}>Yes/No</option>
+        </select>
+        <button type="button" class="btn btn-danger" style="padding:6px 10px; font-size:0.75rem" onclick="this.parentElement.remove()">✕</button>
+      `;
+      document.getElementById('inv-columns-list').appendChild(el);
+    }
+
+    async function saveInvTable() {
+      const id = document.getElementById('inv-tbl-id-hidden').value;
+      const name = document.getElementById('inv-tbl-name').value.trim();
+      if (!name) { alert('Please enter a spreadsheet name.'); return; }
+      const colRows = document.getElementById('inv-columns-list').children;
+      const columns = [];
+      for (const row of colRows) {
+        const key = row.querySelector('.inv-col-key').value;
+        const label = row.querySelector('.inv-col-label').value.trim();
+        const type = row.querySelector('.inv-col-type').value;
+        if (!label) { alert('All columns must have a name.'); return; }
+        columns.push({ key, label, type });
+      }
+      if (columns.length === 0) { alert('Add at least one column.'); return; }
+
+      try {
+        const res = await fetch('/api/inventory/tables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+          body: JSON.stringify({ id: id || undefined, name, columns })
+        });
+        const result = await res.json();
+        if (!res.ok) { alert(result.error || 'Failed to save.'); return; }
+        closeModal('invTableModal');
+        await loadInvTables();
+      } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    async function importInvFile(event) {
+      const file = event.target.files[0];
+      if (!file || !currentInvTableId) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const res = await fetch(`/api/inventory/tables/${currentInvTableId}/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+            body: JSON.stringify({ fileData: e.target.result })
+          });
+          const result = await res.json();
+          if (!res.ok) { alert(result.error || result.message || 'Import failed.'); return; }
+          alert(`Successfully imported ${result.imported} rows!`);
+          await openInvDetail(currentInvTableId);
+        } catch (err) { alert('Import error: ' + err.message); }
+        event.target.value = '';
+      };
       reader.readAsText(file);
     }
 
-    async function exportProductsCSV() {
+    async function exportInvCSV() {
+      if (!currentInvTableId || !currentInvTableData) return;
       try {
-        const { data: products, error } = await sb.from('products').select('*').eq('profile_id', me.id).order('created_at', { ascending: false });
-        if (error) throw error;
-
-        if (!products || products.length === 0) {
-          alert('No products to export.');
-          return;
-        }
-
-        const headers = ['Product Name', 'Category', 'Price (USD)', 'Stock', 'Sell by bot', 'Status', 'Image URL', 'Description'];
-        const rows = products.map(p => {
-          return [
-            `"${(p.name || '').replace(/"/g, '""')}"`,
-            `"${(p.category || '').replace(/"/g, '""')}"`,
-            p.price,
-            p.stock_quantity,
-            p.is_sellable ? 'SELLING' : 'DEACTIVATE',
-            p.is_active ? 'ACTIVE' : 'DRAFT',
-            `"${(p.image_url || '').replace(/"/g, '""')}"`,
-            `"${(p.description || '').replace(/"/g, '""')}"`
-          ].join(',');
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + '\n' + rows.join('\n');
-        const encodedUri = encodeURI(csvContent);
+        const res = await fetch(`/api/inventory/tables/${currentInvTableId}/rows`, { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        const rows = await res.json();
+        const cols = currentInvTableData.columns || [];
+        const headers = cols.map(c => `"${c.label}"`).join(',');
+        const csvRows = rows.map(r => cols.map(c => `"${String(r.data[c.key] ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+        const csvContent = 'data:text/csv;charset=utf-8,' + headers + '\n' + csvRows;
         const a = document.createElement('a');
-        a.setAttribute('href', encodedUri);
-        a.setAttribute('download', 'blockscom_inventory_export.csv');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-      } catch (err) {
-        alert('Failed to construct export file: ' + err.message);
-      }
+        a.href = encodeURI(csvContent);
+        a.download = `${currentInvTableData.name.replace(/\s+/g, '_')}_export.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      } catch (e) { alert('Export failed: ' + e.message); }
     }
 
-    async function updateInventoryKb(products) {
-      const includeImage = document.getElementById('sync-chk-image')?.checked ?? true;
-      const includeName = document.getElementById('sync-chk-name')?.checked ?? true;
-      const includeCategory = document.getElementById('sync-chk-category')?.checked ?? true;
-      const includePrice = document.getElementById('sync-chk-price')?.checked ?? true;
-      const includeStock = document.getElementById('sync-chk-stock')?.checked ?? true;
-
-      const title = "Product Catalog";
-      let md = `# Store Catalog (Currency: ${displayCurrency})\n\n`;
-
-      const filteredProducts = products.filter(p => p.is_active && p.is_sellable).map(p => {
-        let np = { ...p };
-        if (!includeImage) delete np.image_url;
-        if (!includeName) delete np.name;
-        if (!includeCategory) delete np.category;
-        if (!includePrice) delete np.price;
-        if (!includeStock) delete np.stock_quantity;
-        return np;
-      });
-
-      filteredProducts.forEach(p => {
-        let lines = [];
-        if (includeName) md += `### ${p.name || 'Product ' + p.id}\n`;
-        else md += `### Product ${p.id}\n`;
-
-        if (includePrice && p.price !== undefined) lines.push(`- **Price**: ${formatPrice(p.price)}`);
-        if (includeCategory && p.category !== undefined) lines.push(`- **Category**: ${p.category || 'General'}`);
-        if (includeStock && p.stock_quantity !== undefined) lines.push(`- **Stock**: ${p.stock_quantity > 0 ? 'Available (' + p.stock_quantity + ')' : 'Sold Out'}`);
-
-        lines.push(`- **Description**: ${p.description || 'No description available.'}`);
-
-        if (includeImage && p.image_url) lines.push(`- **Image**: ${p.image_url}`);
-
-        md += lines.join('\n') + '\n\n';
-      });
-      md += `\n*Note: All prices are auto-converted from USD based on latest exchange rates.*\n\n`;
-      md += `<!-- DATABASE_START -->\n\`\`\`json\n${JSON.stringify(filteredProducts, null, 2)}\n\`\`\`\n<!-- DATABASE_END -->`;
-
-      const { data: existing } = await sb.from('knowledge_entries').select('id').eq('profile_id', me.id).eq('title', title).single();
-
-      const body = { id: existing?.id, title, content: md };
-      await fetch('/api/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) });
-      console.log("Inventory KB Updated & Synced.");
+    // Inventory table selector for page modal
+    async function renderInvTableSelector(selectedSet) {
+      const list = document.getElementById('inv-table-selector-list');
+      try {
+        // Re-fetch to be current
+        const res = await fetch('/api/inventory/tables', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        const tables = await res.json();
+        if (tables.length === 0) {
+          list.innerHTML = '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">No inventory spreadsheets found. Create one in the Inventory tab first.</p>';
+          return;
+        }
+        list.innerHTML = tables.map(t => {
+          const kbTitle = `Inventory: ${t.name}`;
+          return `<label class="kb-checkbox">
+            <input type="checkbox" value="${escapeHtml(kbTitle)}" ${selectedSet.has(kbTitle) ? 'checked' : ''}>
+            <span>📊 ${escapeHtml(t.name)}</span>
+          </label>`;
+        }).join('');
+      } catch (e) {
+        list.innerHTML = '<p style="font-size:0.8rem; color:var(--danger); padding:12px">Failed to load inventory tables.</p>';
+      }
     }
 
     function updateWebhookUrl(systemId) {
@@ -2234,7 +2109,7 @@
       }
 
       renderKbSelectionList(kbOptions, selected);
-      await renderProductSelectionList(selected);
+      await renderInvTableSelector(selected);
 
       // Restrict model dropdown for FREE users
       const modelSelect = document.getElementById('p-model');
@@ -2257,8 +2132,7 @@
 
     function renderKbSelectionList(options, selectedSet) {
       const list = document.getElementById('kb-selector-list');
-      // Filter out 'prod:' and 'cat:' selections from the basic kb list
-      list.innerHTML = options.filter(k => k.title !== 'Product Catalog').map(k => `
+      list.innerHTML = options.map(k => `
         <label class="kb-checkbox" data-title="${escapeHtml(k.title.toLowerCase())}">
           <input type="checkbox" value="${escapeHtml(k.title)}" ${selectedSet.has(k.title) ? 'checked' : ''}>
           <span>${escapeHtml(k.title)}</span>
@@ -2266,55 +2140,9 @@
       `).join('') || '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">No knowledge skills found. Create some in the Knowledge Base tab.</p>';
     }
 
-    async function renderProductSelectionList(selectedSet) {
-      const list = document.getElementById('product-selector-list');
-      try {
-        const { data: kb } = await sb.from('knowledge_entries').select('*').eq('profile_id', me.id).eq('title', 'Product Catalog').single();
-        let products = [];
-        if (kb && kb.content) {
-          const jsonMatch = kb.content.match(/```json\n([\s\S]*?)\n```/);
-          if (jsonMatch) products = JSON.parse(jsonMatch[1]);
-        }
-
-        // Extract unique categories
-        const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
-
-        let html = '';
-        if (categories.length > 0) {
-          html += categories.map(c => `
-            <label class="kb-checkbox" data-title="cat:${escapeHtml(c.toLowerCase())}" style="border-left: 3px solid var(--primary)">
-              <input type="checkbox" value="cat:${escapeHtml(c)}" ${selectedSet.has(`cat:${c}`) ? 'checked' : ''}>
-              <span>📦 Category: ${escapeHtml(c)}</span>
-            </label>
-          `).join('');
-        }
-
-        if (products.length > 0) {
-          html += products.map(p => `
-            <label class="kb-checkbox" data-title="prod:${escapeHtml(p.name.toLowerCase())}">
-              <input type="checkbox" value="prod:${escapeHtml(p.name)}" ${selectedSet.has(`prod:${p.name}`) ? 'checked' : ''}>
-              <span>${escapeHtml(p.name)} <span style="font-size:0.7rem; color:var(--text-dim)">(${escapeHtml(p.category || 'General')})</span></span>
-            </label>
-          `).join('');
-        }
-
-        list.innerHTML = html || '<p style="font-size:0.8rem; color:var(--text-dim); padding:12px">No products found. Add items to your inventory first.</p>';
-      } catch (e) {
-        list.innerHTML = '<p style="font-size:0.8rem; color:var(--danger); padding:12px">Failed to load product catalog.</p>';
-      }
-    }
-
     function filterSkills(query) {
       const q = query.toLowerCase();
       document.querySelectorAll('#kb-selector-list .kb-checkbox').forEach(el => {
-        const title = el.getAttribute('data-title');
-        el.style.display = title.includes(q) ? 'flex' : 'none';
-      });
-    }
-
-    function filterProducts(query) {
-      const q = query.toLowerCase();
-      document.querySelectorAll('#product-selector-list .kb-checkbox').forEach(el => {
         const title = el.getAttribute('data-title');
         el.style.display = title.includes(q) ? 'flex' : 'none';
       });
@@ -2330,9 +2158,9 @@
 
       const aTok = document.getElementById('p-atok').value;
       const kbSelected = Array.from(document.querySelectorAll('#kb-selector-list input:checked')).map(i => i.value);
-      const prodSelected = Array.from(document.querySelectorAll('#product-selector-list input:checked')).map(i => i.value);
+      const invSelected = Array.from(document.querySelectorAll('#inv-table-selector-list input:checked')).map(i => i.value);
 
-      const combinedSelections = [...kbSelected, ...prodSelected];
+      const combinedSelections = [...kbSelected, ...invSelected];
 
       const body = {
         id: document.getElementById('p-id-hidden').value || undefined,
