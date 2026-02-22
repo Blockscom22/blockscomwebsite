@@ -87,6 +87,22 @@ setInterval(() => {
   }
 }, 300000);
 
+// Facebook Webhook Signature Verification (X-Hub-Signature-256)
+const FB_APP_SECRET = process.env.FB_APP_SECRET || '';
+if (!FB_APP_SECRET) {
+  console.warn('SECURITY WARNING: FB_APP_SECRET is not set. Webhook signature verification is DISABLED. Set FB_APP_SECRET in your environment variables for production.');
+}
+
+function verifyFbSignature(req) {
+  if (!FB_APP_SECRET) return true; // Skip if not configured (dev mode)
+  const signature = req.headers['x-hub-signature-256'];
+  if (!signature) return false;
+  const expectedHash = 'sha256=' + crypto.createHmac('sha256', FB_APP_SECRET)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedHash));
+}
+
 function encryptSecret(plain) {
   if (!plain) return null;
   const iv = crypto.randomBytes(12);
@@ -304,6 +320,16 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
 
 app.post('/api/knowledge', requireAuth, async (req, res) => {
   const { id, title, content } = req.body;
+
+  // Content size limit: 50KB max
+  if (content && content.length > 51200) {
+    return res.status(400).json({ error: 'Knowledge base content exceeds maximum size of 50KB.' });
+  }
+  // Title size limit: 200 chars max
+  if (title && title.length > 200) {
+    return res.status(400).json({ error: 'Title exceeds maximum length of 200 characters.' });
+  }
+
   let result;
 
   if (id) {
@@ -564,14 +590,21 @@ app.put('/api/admin/users/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-// API: Logs
+// API: Logs (filtered at DB level for data isolation)
 app.get('/api/logs', requireAuth, async (req, res) => {
-  const query = supabase.from('activity_logs').select('*, fb_pages(name, profile_id)').order('created_at', { ascending: false }).limit(100);
-  const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
+  // First get user's page IDs, then filter logs at the DB level
+  const { data: userPages } = await supabase.from('fb_pages').select('id').eq('profile_id', req.user.id);
+  if (!userPages || userPages.length === 0) return res.json([]);
 
-  const filtered = data.filter(l => l.fb_pages?.profile_id === req.user.id);
-  res.json(filtered);
+  const pageIds = userPages.map(p => p.id);
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .select('*, fb_pages(name, profile_id)')
+    .in('fb_page_id', pageIds)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
 });
 
 // API: Logs Stats
@@ -730,10 +763,15 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
       return res.status(429).json({ error: 'daily reply limit reached for your tier' });
     }
 
-    // Optional domain allowlist check
+    // Domain allowlist check (strict hostname match)
     const origin = String(req.headers.origin || '');
     if (Array.isArray(page.allowed_domains) && page.allowed_domains.length > 0) {
-      const allowed = page.allowed_domains.some(d => origin.includes(String(d)));
+      let originHostname = '';
+      try { originHostname = new URL(origin).hostname; } catch (_) { }
+      const allowed = page.allowed_domains.some(d => {
+        const domain = String(d).replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+        return originHostname === domain || originHostname.endsWith('.' + domain);
+      });
       if (!allowed) return res.status(403).json({ error: 'origin not allowed' });
     }
 
@@ -1167,32 +1205,35 @@ app.get('/webhook', async (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  const pageId = req.query.page; // system ID
+  const pageId = req.query.page; // system ID — REQUIRED for security
 
   if (mode === 'subscribe' && token) {
-    let query = supabase.from('fb_pages').select('verify_token');
-    if (pageId) {
-      // If a specific system page ID is provided in the URL query, only verify against that one
-      query = query.eq('id', pageId);
+    if (!pageId) {
+      console.warn('Webhook verification rejected: missing ?page= parameter');
+      return res.sendStatus(400);
     }
-    const { data: pages, error } = await query;
+
+    const { data: pages, error } = await supabase
+      .from('fb_pages')
+      .select('verify_token')
+      .eq('id', pageId);
 
     if (error) {
       console.error('Webhook verification DB error:', error);
       return res.sendStatus(500);
     }
 
-    // Check if ANY matching page matches the verify token
+    // Check if the specific page's token matches
     const isValid = pages.some(p => {
       const decrypted = decryptSecret(p.verify_token);
       return decrypted === token;
     });
 
     if (isValid) {
-      console.log('WEBHOOK_VERIFIED' + (pageId ? ` FOR SYS_ID ${pageId}` : ''));
+      console.log(`WEBHOOK_VERIFIED FOR SYS_ID ${pageId}`);
       res.status(200).send(challenge);
     } else {
-      console.warn('Webhook verification failed: Invalid token' + (pageId ? ` for sys_id ${pageId}` : ''));
+      console.warn(`Webhook verification failed: Invalid token for sys_id ${pageId}`);
       res.sendStatus(403);
     }
   } else {
@@ -1201,6 +1242,12 @@ app.get('/webhook', async (req, res) => {
 });
 
 app.post('/webhook', async (req, res) => {
+  // Verify Facebook signature to prevent fake webhook attacks
+  if (!verifyFbSignature(req)) {
+    console.warn('[WEBHOOK POST] Invalid or missing X-Hub-Signature-256 — rejecting');
+    return res.sendStatus(403);
+  }
+
   const body = req.body;
   console.log('[WEBHOOK POST] Received:', JSON.stringify(body?.object), 'entries:', body?.entry?.length || 0);
 
