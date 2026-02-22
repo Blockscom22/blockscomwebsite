@@ -1042,17 +1042,17 @@ async function processMessage(event, fbPageId) {
   }
 }
 
-app.get(['/webhook', '/webhook/:page_id'], async (req, res) => {
+app.get('/webhook', async (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  const pageId = req.params.page_id;
+  const pageId = req.query.page; // system ID
 
   if (mode === 'subscribe' && token) {
     let query = supabase.from('fb_pages').select('verify_token');
     if (pageId) {
-      // If a specific page ID is provided in the URL, only verify against that one
-      query = query.eq('fb_page_id', pageId);
+      // If a specific system page ID is provided in the URL query, only verify against that one
+      query = query.eq('id', pageId);
     }
     const { data: pages, error } = await query;
 
@@ -1068,10 +1068,10 @@ app.get(['/webhook', '/webhook/:page_id'], async (req, res) => {
     });
 
     if (isValid) {
-      console.log('WEBHOOK_VERIFIED' + (pageId ? ` FOR PAGE ${pageId}` : ''));
+      console.log('WEBHOOK_VERIFIED' + (pageId ? ` FOR SYS_ID ${pageId}` : ''));
       res.status(200).send(challenge);
     } else {
-      console.warn('Webhook verification failed: Invalid token' + (pageId ? ` for page ${pageId}` : ''));
+      console.warn('Webhook verification failed: Invalid token' + (pageId ? ` for sys_id ${pageId}` : ''));
       res.sendStatus(403);
     }
   } else {
@@ -1079,7 +1079,7 @@ app.get(['/webhook', '/webhook/:page_id'], async (req, res) => {
   }
 });
 
-app.post(['/webhook', '/webhook/:page_id'], async (req, res) => {
+app.post('/webhook', async (req, res) => {
   const body = req.body;
   // page_id is in req.params.page_id, but the payload 'entry.id' always contains the receiving Page ID anyway, so we just process it normally.
 

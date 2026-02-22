@@ -810,7 +810,7 @@
         <label>Widget Chatbot Name</label><input id="p-widget-name" class="input"
           placeholder="e.g. Blockscom Assistant">
         <label>Facebook Page ID (Numeric)</label><input id="p-id" class="input" placeholder="Find this in Page settings"
-          required oninput="updateWebhookUrl(this.value)">
+          required>
 
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px">
           <div><label>Verify Token</label><input id="p-vtok" class="input" type="password"
@@ -1215,7 +1215,7 @@
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
-            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">https://www.blockscom.xyz/webhook/${p.fb_page_id ? p.fb_page_id : '[YOUR_PAGE_ID]'}</code>
+            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">https://www.blockscom.xyz/webhook?page=${p.id}</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
@@ -1785,9 +1785,9 @@
       console.log("Inventory KB Updated & Synced.");
     }
 
-    function updateWebhookUrl(pageId) {
+    function updateWebhookUrl(systemId) {
       const baseUrl = 'https://www.blockscom.xyz/webhook';
-      document.getElementById('modal-webhook-link').innerText = pageId ? `${baseUrl}/${pageId}` : `${baseUrl}/[YOUR_PAGE_ID]`;
+      document.getElementById('modal-webhook-link').innerText = systemId ? `${baseUrl}?page=${systemId}` : baseUrl;
     }
 
     function copyWebhookLink(btn) {
@@ -1819,7 +1819,7 @@
       document.getElementById('pageModalTitle').innerText = id ? 'Update Configuration' : 'New Webhook Setup';
 
       const targetId = id || ('temp-' + Date.now());
-      document.getElementById('modal-webhook-link').innerText = 'https://www.blockscom.xyz/webhook/[YOUR_PAGE_ID]';
+      updateWebhookUrl(targetId);
       document.getElementById('p-id-hidden').value = id || '';
       document.getElementById('p-name').value = '';
       document.getElementById('p-widget-name').value = '';
@@ -1845,7 +1845,7 @@
           document.getElementById('p-name').value = p.name;
           document.getElementById('p-widget-name').value = p.widget_name || '';
           document.getElementById('p-id').value = p.fb_page_id;
-          updateWebhookUrl(p.fb_page_id);
+          updateWebhookUrl(p.id);
 
           let modelVal = p.ai_model || 'openai/gpt-4o';
           if (modelVal === 'openai/gpt-5.2') modelVal = 'openai/gpt-4o';
