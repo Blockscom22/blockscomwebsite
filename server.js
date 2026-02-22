@@ -337,6 +337,44 @@ app.delete('/api/pages/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// API: Generate Sync Token (Messenger Notification)
+app.post('/api/pages/:id/generate-sync-token', requireAuth, async (req, res) => {
+  try {
+    const token = 'SYNC-' + crypto.randomBytes(3).toString('hex').toUpperCase() + '-' + Math.floor(1000 + Math.random() * 9000);
+    const { error } = await supabase.from('fb_pages').update({ sync_token: token }).eq('id', req.params.id).eq('profile_id', req.user.id);
+    if (error) throw error;
+    res.json({ success: true, sync_token: token });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Cancel Messenger Sync
+app.post('/api/pages/:id/cancel-sync', requireAuth, async (req, res) => {
+  try {
+    const { error } = await supabase.from('fb_pages').update({ sync_token: null, owner_psid: null, notify_on_order: false }).eq('id', req.params.id).eq('profile_id', req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Update Notification Settings
+app.put('/api/pages/:id/notify-settings', requireAuth, async (req, res) => {
+  try {
+    const { notify_on_order, notify_style } = req.body;
+    const { error } = await supabase.from('fb_pages').update({
+      notify_on_order: !!notify_on_order,
+      notify_style: notify_style || 'detailed'
+    }).eq('id', req.params.id).eq('profile_id', req.user.id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Default PERSONALITY skill content
 const DEFAULT_PERSONALITY_CONTENT = `You are a real, friendly human assistant representing the business.
 
@@ -1465,6 +1503,56 @@ async function processMessage(event, fbPageId) {
     const userProfile = page.profiles;
     debugLog(`[DEBUG] Found page: ${page.name}. Credits: ${userProfile?.credits}, Role: ${userProfile?.role}`);
 
+    // ----- SYNC TOKEN INTERCEPTION -----
+    // Check if the user is sending a sync token to register their owner_psid
+    if (page.sync_token && messageText && messageText.trim() === page.sync_token) {
+      debugLog(`[DEBUG] SYNC TOKEN MATCHED for Page ID: ${targetPageId}`);
+
+      const { error: syncErr } = await supabase.from('fb_pages').update({
+        sync_token: null,
+        owner_psid: senderId,
+        notify_on_order: true // Auto-enable on successful sync
+      }).eq('id', page.id);
+
+      let syncReply = "✅ Sync Successful! You will now receive order notifications for this page.";
+
+      if (!syncErr) {
+        try {
+          // Use the required model for Sync Confirmation per instructions
+          const resolvedApiKey = process.env.OPENROUTER_API_KEY;
+          if (resolvedApiKey) {
+            const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+              model: 'openai/gpt-oss-120b',
+              messages: [{
+                role: 'system',
+                content: `You are the system notification bot for the page "${page.name}". The user just successfully synced their Messenger account to receive order alerts. Write a very brief, friendly, and professional confirmation message acknowledging the sync.`
+              }]
+            }, { headers: { 'Authorization': `Bearer ${resolvedApiKey}` } });
+
+            if (aiRes.data?.choices?.[0]?.message?.content) {
+              syncReply = aiRes.data.choices[0].message.content;
+            }
+          }
+        } catch (aiErr) {
+          console.error('[ERROR] Failed to generate AI sync reply:', aiErr.message);
+          // Fallback to the default syncReply
+        }
+
+        // Send the confirmation
+        const pageAccessToken = decryptSecret(page.access_token);
+        if (pageAccessToken) {
+          await axios.post(
+            `https://graph.facebook.com/v22.0/me/messages`,
+            { recipient: { id: senderId }, message: { text: syncReply } },
+            { params: { access_token: pageAccessToken } }
+          );
+        }
+      }
+
+      return; // Stop further processing, this was a system command.
+    }
+    // -----------------------------------
+
     if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) <= 0) {
       debugLog(`[DEBUG] User ${userProfile.email} out of credits.`);
       return;
@@ -1649,7 +1737,39 @@ async function processMessage(event, fbPageId) {
               console.error("Order Insert Error (Webhook):", insertError);
               replyText = "Sorry, I encountered an error while placing your order. Please try again.";
             } else {
-              replyText = `I have successfully placed your order for ${orderArgs.items.map(i => i.quantity + 'x ' + i.name).join(', ')}. Your total is $${orderArgs.total_amount}. We will ship it to ${orderArgs.shipping_address}. Thank you, ${orderArgs.customer_name}!`;
+              replyText = `I have successfully placed your order for ${orderArgs.items.map(i => i.quantity + 'x ' + i.name).join(', ')}. Your total is ${fbCurrencySymbol}${orderArgs.total_amount}. We will ship it to ${orderArgs.shipping_address}. Thank you, ${orderArgs.customer_name}!`;
+
+              // ----- ORDER NOTIFICATION SYSTEM -----
+              if (page.owner_psid && page.notify_on_order) {
+                try {
+                  const resolvedApiKey = process.env.OPENROUTER_API_KEY;
+                  if (resolvedApiKey) {
+                    const promptText = page.notify_style === 'detailed'
+                      ? `Format a detailed order notification message for the store owner. Use this info:\nName: ${orderArgs.customer_name}\nContact: ${orderArgs.customer_contact}\nShipping Details: ${orderArgs.shipping_address}\nItems Ordered: ${orderArgs.items.map(i => i.quantity + 'x ' + i.name).join(', ')}\nAmount: ${fbCurrencySymbol}${orderArgs.total_amount}\nKeep it very professional and cleanly formatted.`
+                      : `Format a short, exciting "You have a new order!" alert for the store owner. Order amount is ${fbCurrencySymbol}${orderArgs.total_amount} from ${orderArgs.customer_name}.`;
+
+                    const notifRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+                      model: 'openai/gpt-oss-20b',
+                      messages: [{ role: 'system', content: promptText }]
+                    }, { headers: { 'Authorization': `Bearer ${resolvedApiKey}` } });
+
+                    const notifMsg = notifRes.data?.choices?.[0]?.message?.content || `🚨 New Order Confirmed!\nName: ${orderArgs.customer_name}\nTotal: ${fbCurrencySymbol}${orderArgs.total_amount}`;
+                    const pageAccessToken = decryptSecret(page.access_token);
+
+                    if (pageAccessToken) {
+                      await axios.post(
+                        `https://graph.facebook.com/v22.0/me/messages`,
+                        { recipient: { id: page.owner_psid }, message: { text: notifMsg } },
+                        { params: { access_token: pageAccessToken } }
+                      );
+                      debugLog(`[DEBUG] Order notification sent to owner ${page.owner_psid}`);
+                    }
+                  }
+                } catch (notifErr) {
+                  console.error('[ERROR] Failed to send order notification to owner:', notifErr.message);
+                }
+              }
+              // -------------------------------------
             }
           } catch (e) {
             console.error("Failed to parse tool call or insert order:", e);

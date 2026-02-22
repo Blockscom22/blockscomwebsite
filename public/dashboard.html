@@ -1686,6 +1686,47 @@
             <div style="font-size:0.65rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Active Skills (${(p.knowledge_base || []).filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).length})</div>
             <div style="font-size:0.8rem; color:var(--text-muted)">${(p.knowledge_base && p.knowledge_base.length) ? p.knowledge_base.filter(k => !k.startsWith('prod:') && !k.startsWith('cat:')).slice(0, 3).join(', ') + (p.knowledge_base.length > 3 ? ' ...' : '') : 'No skills linked yet'}</div>
           </div>
+          
+          <!-- Messenger Sync UI -->
+          <div style="background:var(--surface-elevated); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:16px">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                Messenger Push Alerts
+              </div>
+              <div>${p.owner_psid ? '<span class="badge badge-premium" style="font-size:0.65rem">Linked</span>' : '<span class="badge badge-free" style="font-size:0.65rem">Not Linked</span>'}</div>
+            </div>
+            
+            ${p.owner_psid ? `
+              <div style="background:var(--bg); border-radius:8px; padding:10px; margin-bottom:10px">
+                <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin:0">
+                  <span style="font-size:0.8rem; font-weight:600">Enable Order Notifications</span>
+                  <input type="checkbox" style="accent-color:var(--primary)" onchange="updateNotifySettings('${p.id}', this.checked, document.getElementById('notify-style-${p.id}').value)" ${p.notify_on_order ? 'checked' : ''}>
+                </label>
+                <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center">
+                  <span style="font-size:0.75rem; color:var(--text-dim)">Alert Style</span>
+                  <select id="notify-style-${p.id}" class="input" style="width:auto; min-width:120px; font-size:0.75rem; padding:4px 8px; margin:0" onchange="updateNotifySettings('${p.id}', ${p.notify_on_order}, this.value)">
+                    <option value="detailed" ${p.notify_style === 'detailed' ? 'selected' : ''}>Detailed Summary</option>
+                    <option value="normal" ${p.notify_style === 'normal' ? 'selected' : ''}>Normal Ping</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-secondary" style="width:100%; font-size:0.75rem; padding:6px" onclick="cancelMessengerSync('${p.id}')">Unlink Messenger</button>
+            ` : `
+              <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:12px; line-height:1.4">Link your personal Messenger account to receive instant notifications when an AI processes a new order.</p>
+              ${p.sync_token ? `
+                <div style="background:var(--bg); border:1px solid var(--primary); border-radius:8px; padding:12px; text-align:center">
+                  <div style="font-size:0.7rem; color:var(--text-dim); margin-bottom:6px">Send this code to your Page in Messenger:</div>
+                  <div style="font-family:monospace; font-size:1.1rem; font-weight:700; color:var(--primary); margin-bottom:8px; letter-spacing:1px">${p.sync_token}</div>
+                  <button class="btn btn-secondary" style="font-size:0.7rem; padding:4px 10px" onclick="copyText('${p.sync_token}', this)">Copy Code</button>
+                  <div style="font-size:0.65rem; color:var(--text-muted); margin-top:8px">Waiting for webhook sync... Refresh page after sending.</div>
+                </div>
+              ` : `
+                <button class="btn btn-secondary" style="width:100%; font-size:0.75rem" onclick="generateSyncToken('${p.id}')">Generate Sync Code</button>
+              `}
+            `}
+          </div>
+
           <div style="display:flex; gap:10px">
             <button class="btn btn-secondary" style="flex:1" onclick="openPageModal('${p.id}')">Edit Config</button>
             <button class="btn btn-danger" onclick="deletePage('${p.id}')">Del</button>
@@ -3023,6 +3064,61 @@
       } finally {
         btn.innerText = originalText;
         btn.disabled = false;
+      }
+    }
+
+    async function generateSyncToken(id) {
+      if (!confirm('This will generate a new sync code. Continue?')) return;
+      try {
+        const res = await fetch(`/api/pages/${id}/generate-sync-token`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        await loadPages(); // Reload to show the code
+      } catch (e) {
+        showCustomAlert('Failed to generate code: ' + e.message);
+      }
+    }
+
+    async function cancelMessengerSync(id) {
+      if (!confirm('Are you sure you want to stop receiving order notifications for this page?')) return;
+      try {
+        const res = await fetch(`/api/pages/${id}/cancel-sync`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentSession.access_token}` }
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        await loadPages();
+      } catch (e) {
+        showCustomAlert('Failed to cancel sync: ' + e.message);
+      }
+    }
+
+    async function updateNotifySettings(id, enableNotifications, style) {
+      try {
+        const res = await fetch(`/api/pages/${id}/notify-settings`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.access_token}`
+          },
+          body: JSON.stringify({ notify_on_order: enableNotifications, notify_style: style })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        // Update local cache to prevent jumpiness on next render
+        const idx = pagesCache.findIndex(p => p.id === id);
+        if (idx !== -1) {
+          pagesCache[idx].notify_on_order = enableNotifications;
+          pagesCache[idx].notify_style = style;
+        }
+      } catch (e) {
+        showCustomAlert('Failed to update settings: ' + e.message);
+        await loadPages(); // Revert UI if failed
       }
     }
 
