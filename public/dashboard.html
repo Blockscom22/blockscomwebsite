@@ -765,7 +765,41 @@
             <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Create custom spreadsheets to organize
               your products and inventory. Each auto-syncs to your AI knowledge base.</p>
           </div>
-          <button class="btn btn-primary" onclick="openInvTableModal()">+ New Spreadsheet</button>
+          <div style="display:flex; gap:12px; align-items:center">
+            <div style="position:relative; display:inline-block" id="inv-template-dropdown">
+              <button class="btn btn-secondary"
+                onclick="document.getElementById('inv-template-menu').style.display = document.getElementById('inv-template-menu').style.display === 'block' ? 'none' : 'block'">📋
+                Use Template ▾</button>
+              <div id="inv-template-menu"
+                style="display:none; position:absolute; top:100%; right:0; margin-top:6px; background:var(--surface-elevated); border:1px solid var(--border); border-radius:12px; min-width:240px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,0.3); overflow:hidden">
+                <div
+                  style="padding:12px 16px; border-bottom:1px solid var(--border); font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px">
+                  Choose a Template</div>
+                <div onclick="openInvFromTemplate('products')"
+                  style="padding:12px 16px; cursor:pointer; transition:background 0.15s"
+                  onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
+                  <div style="font-weight:600; font-size:0.9rem">🛍️ Products</div>
+                  <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">Name, Price, Stock, Category,
+                    Description</div>
+                </div>
+                <div onclick="openInvFromTemplate('food')"
+                  style="padding:12px 16px; cursor:pointer; transition:background 0.15s"
+                  onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
+                  <div style="font-weight:600; font-size:0.9rem">🍔 Food Menu</div>
+                  <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">Item, Price, Category,
+                    Available, Description</div>
+                </div>
+                <div onclick="openInvFromTemplate('appointments')"
+                  style="padding:12px 16px; cursor:pointer; transition:background 0.15s; border-radius:0 0 12px 12px"
+                  onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
+                  <div style="font-weight:600; font-size:0.9rem">📅 Appointments</div>
+                  <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px">Service, Duration, Price,
+                    Available, Notes</div>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="openInvTableModal()">+ New Spreadsheet</button>
+          </div>
         </div>
         <div id="inv-tables-list" class="grid"></div>
       </div>
@@ -1874,6 +1908,53 @@
         await fetch(`/api/inventory/tables/${currentInvTableId}/sync`, { method: 'POST', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
         alert('Synced to Knowledge Base!');
       } catch (e) { alert('Sync failed: ' + e.message); }
+    }
+
+    // Spreadsheet Templates
+    const INV_TEMPLATES = {
+      products: {
+        name: 'Products',
+        columns: [
+          { key: 'col_name', label: 'Product Name', type: 'text' },
+          { key: 'col_price', label: 'Price', type: 'number' },
+          { key: 'col_stock', label: 'Stock', type: 'number' },
+          { key: 'col_category', label: 'Category', type: 'text' },
+          { key: 'col_description', label: 'Description', type: 'text' }
+        ]
+      },
+      food: {
+        name: 'Food Menu',
+        columns: [
+          { key: 'col_item', label: 'Item Name', type: 'text' },
+          { key: 'col_price', label: 'Price', type: 'number' },
+          { key: 'col_category', label: 'Category', type: 'text' },
+          { key: 'col_available', label: 'Available', type: 'boolean' },
+          { key: 'col_description', label: 'Description', type: 'text' }
+        ]
+      },
+      appointments: {
+        name: 'Appointments',
+        columns: [
+          { key: 'col_service', label: 'Service Name', type: 'text' },
+          { key: 'col_duration', label: 'Duration (mins)', type: 'number' },
+          { key: 'col_price', label: 'Price', type: 'number' },
+          { key: 'col_available', label: 'Available', type: 'boolean' },
+          { key: 'col_notes', label: 'Notes', type: 'text' }
+        ]
+      }
+    };
+
+    function openInvFromTemplate(templateKey) {
+      document.getElementById('inv-template-menu').style.display = 'none';
+      const tmpl = INV_TEMPLATES[templateKey];
+      if (!tmpl) return;
+      invColumnCounter = 0;
+      document.getElementById('inv-tbl-id-hidden').value = '';
+      document.getElementById('inv-tbl-name').value = tmpl.name;
+      document.getElementById('inv-columns-list').innerHTML = '';
+      document.getElementById('invTableModalTitle').innerText = 'New Spreadsheet (Template)';
+      tmpl.columns.forEach(c => addInvColumn(c));
+      document.getElementById('invTableModal').style.display = 'flex';
     }
 
     // Column Manager for Table Modal
