@@ -590,6 +590,37 @@ app.put('/api/admin/users/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// API: Admin - Get All Activity Logs (with user + page info)
+app.get('/api/admin/logs', requireAuth, async (req, res) => {
+  if (req.user.profile.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('*, fb_pages(name, fb_page_id, profile_id, is_enabled, profiles:profile_id(email, role))')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// API: Admin - Get All Pages (webhook status overview)
+app.get('/api/admin/pages', requireAuth, async (req, res) => {
+  if (req.user.profile.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { data, error } = await supabase
+      .from('fb_pages')
+      .select('id, name, fb_page_id, ai_model, is_enabled, created_at, profiles:profile_id(email, role, credits)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // API: Logs (filtered at DB level for data isolation)
 app.get('/api/logs', requireAuth, async (req, res) => {
   // First get user's page IDs, then filter logs at the DB level

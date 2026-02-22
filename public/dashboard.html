@@ -626,6 +626,34 @@
       margin-bottom: 4px;
       border-bottom: 1px solid var(--border);
     }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+      }
+    }
+
+    .admin-log-new {
+      animation: flash-row 1s ease-out;
+    }
+
+    @keyframes flash-row {
+      from {
+        background: rgba(34, 197, 94, 0.15);
+      }
+
+      to {
+        background: transparent;
+      }
+    }
   </style>
   <link rel="icon" href="data:,">
 </head>
@@ -647,6 +675,7 @@
       <div class="nav-label">Settings</div>
       <div class="nav-item" id="nav-settings" onclick="showView('settings')">Platform Settings</div>
       <div id="admin-nav" class="nav-item" style="display:none" onclick="showView('admin')">Admin Controls</div>
+      <div id="admin-logs-nav" class="nav-item" style="display:none" onclick="showView('admin-logs')">Admin Logs</div>
     </div>
 
     <div class="user-card">
@@ -821,6 +850,69 @@
               </tr>
             </thead>
             <tbody id="admin-users"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- View: Admin Logs -->
+    <div id="view-admin-logs" class="view-section" style="display:none">
+      <div class="header">
+        <div>
+          <h1>Admin Logs</h1>
+          <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Live system activity across all users &
+            webhooks.</p>
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-secondary" onclick="loadAdminLogs()" style="padding:8px 16px">↻ Refresh</button>
+          <div
+            style="display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 12px;">
+            <div id="admin-live-dot"
+              style="width:8px; height:8px; border-radius:50%; background:#22c55e; animation: pulse-dot 2s infinite;">
+            </div>
+            <span
+              style="font-size:0.75rem; color:var(--text-dim); font-weight:600; text-transform:uppercase">Live</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Webhook Status Overview -->
+      <div class="card" style="margin-bottom:24px">
+        <h2 style="margin-bottom:16px">Webhook Status Overview</h2>
+        <div class="table-responsive">
+          <table style="margin:0">
+            <thead>
+              <tr>
+                <th>Page Name</th>
+                <th>Owner</th>
+                <th>AI Model</th>
+                <th>Status</th>
+                <th>Credits</th>
+              </tr>
+            </thead>
+            <tbody id="admin-pages-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Live Activity Feed -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px">
+          <h2>Activity Feed</h2>
+          <div style="font-size:0.75rem; color:var(--text-dim)" id="admin-log-count">0 events</div>
+        </div>
+        <div class="table-responsive" style="max-height:600px; overflow-y:auto">
+          <table style="margin:0">
+            <thead style="position:sticky; top:0; z-index:1; background:var(--surface)">
+              <tr>
+                <th style="white-space:nowrap">Time</th>
+                <th>Page</th>
+                <th>Owner</th>
+                <th>Type</th>
+                <th style="max-width:500px">Message</th>
+              </tr>
+            </thead>
+            <tbody id="admin-logs-table"></tbody>
           </table>
         </div>
       </div>
@@ -1282,7 +1374,10 @@
           const cachedMe = JSON.parse(cachedMeStr);
           document.getElementById('u-tier').innerText = `TIER: ${cachedMe.role}`;
           document.getElementById('u-credits').innerText = `Credits: ${cachedMe.credits.toLocaleString()}`;
-          if (cachedMe.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+          if (cachedMe.role === 'ADMIN') {
+            document.getElementById('admin-nav').style.display = 'flex';
+            document.getElementById('admin-logs-nav').style.display = 'flex';
+          }
           if (cachedMe.currency) displayCurrency = cachedMe.currency;
         } catch (e) { }
       }
@@ -1308,7 +1403,10 @@
           document.getElementById('u-email').innerText = me.email;
           document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
           document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
-          if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+          if (me.role === 'ADMIN') {
+            document.getElementById('admin-nav').style.display = 'flex';
+            document.getElementById('admin-logs-nav').style.display = 'flex';
+          }
 
           await loadRates();
           document.getElementById('price-th').innerHTML = `<label style="display:inline-flex; align-items:center; gap:4px; font-weight:inherit; margin:0;"><input type="checkbox" id="sync-chk-price" checked onchange="forceSyncProducts()" title="Sync Price"> Price (${displayCurrency})</label>`;
@@ -1677,10 +1775,11 @@
       document.querySelectorAll('.view-section').forEach(d => d.style.display = 'none');
       document.getElementById('view-' + view).style.display = 'block';
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      const navId = view === 'admin' ? 'admin-nav' : 'nav-' + view;
+      const navId = view === 'admin' ? 'admin-nav' : view === 'admin-logs' ? 'admin-logs-nav' : 'nav-' + view;
       const nav = document.getElementById(navId);
       if (nav) nav.classList.add('active');
       if (view === 'admin') loadAdminUsers();
+      if (view === 'admin-logs') { loadAdminLogs(); startAdminLogsSubscription(); }
       if (view === 'kb') loadKb();
       if (view === 'logs') loadLogs();
       if (view === 'pages') loadPages();
@@ -2717,6 +2816,86 @@
     }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
     async function logout() { await sb.auth.signOut(); window.location.href = '/login'; }
+
+    // ==================== ADMIN LOGS ====================
+    let adminLogsCache = [];
+    let adminLogsSubscription = null;
+
+    async function loadAdminLogs() {
+      try {
+        const [logsRes, pagesRes] = await Promise.all([
+          fetch('/api/admin/logs', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }),
+          fetch('/api/admin/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } })
+        ]);
+        const logs = await logsRes.json();
+        const pages = await pagesRes.json();
+        if (logsRes.ok) { adminLogsCache = logs; renderAdminLogs(); }
+        if (pagesRes.ok) renderAdminPages(pages);
+      } catch (e) { console.error('Admin logs error:', e); }
+    }
+
+    function renderAdminPages(pages) {
+      const tbody = document.getElementById('admin-pages-table');
+      if (!pages || pages.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No pages found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = pages.map(p => `
+        <tr>
+          <td style="font-weight:600">${escapeHtml(p.name)}</td>
+          <td>
+            <div style="font-size:0.85rem">${escapeHtml(p.profiles?.email || 'Unknown')}</div>
+            <div style="font-size:0.7rem; color:var(--text-dim)">${p.profiles?.role || '-'}</div>
+          </td>
+          <td style="font-size:0.8rem; font-family:monospace; color:var(--text-muted)">${escapeHtml(p.ai_model || 'default')}</td>
+          <td>
+            <span class="badge ${p.is_enabled ? 'badge-premium' : 'badge-free'}" style="font-size:0.7rem">${p.is_enabled ? '● Active' : '○ Disabled'}</span>
+          </td>
+          <td style="font-weight:600">${p.profiles?.credits ?? '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAdminLogs(highlight) {
+      const tbody = document.getElementById('admin-logs-table');
+      document.getElementById('admin-log-count').innerText = `${adminLogsCache.length} events`;
+      if (!adminLogsCache || adminLogsCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No activity logs yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = adminLogsCache.map((l, i) => {
+        const isNew = highlight && i === 0;
+        return `
+          <tr class="${isNew ? 'admin-log-new' : ''}">
+            <td style="color:var(--text-dim); white-space:nowrap; font-size:0.8rem">${new Date(l.created_at).toLocaleString()}</td>
+            <td style="font-weight:600; font-size:0.85rem">${escapeHtml(l.fb_pages?.name || '---')}</td>
+            <td>
+              <div style="font-size:0.8rem">${escapeHtml(l.fb_pages?.profiles?.email || '---')}</div>
+              <div style="font-size:0.65rem; color:var(--text-dim)">${escapeHtml(l.fb_pages?.profiles?.role || '')}</div>
+            </td>
+            <td><span class="badge ${l.type === 'AUTO_REPLY' ? 'badge-premium' : 'badge-free'}" style="font-size:0.65rem">${l.type}</span></td>
+            <td style="max-width:500px; font-size:0.8rem; line-height:1.4">
+              ${l.payload ? `
+                ${l.payload.sender ? `<div style="font-size:0.65rem; color:var(--primary); font-family:monospace; margin-bottom:2px">Sender: ${escapeHtml(l.payload.sender)}</div>` : ''}
+                ${l.payload.in ? `<div style="margin-bottom:2px"><strong>User:</strong> <span style="color:var(--text-dim)">${escapeHtml(l.payload.in.substring(0, 120))}${l.payload.in.length > 120 ? '...' : ''}</span></div>` : ''}
+                ${l.payload.out ? `<div><strong>AI:</strong> <span style="color:var(--text)">${escapeHtml(l.payload.out.substring(0, 120))}${l.payload.out.length > 120 ? '...' : ''}</span></div>` : ''}
+              ` : 'No payload'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function startAdminLogsSubscription() {
+      if (adminLogsSubscription) return;
+      adminLogsSubscription = sb.channel('admin-activity-logs')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, async (payload) => {
+          // Re-fetch to get joined data
+          await loadAdminLogs();
+          renderAdminLogs(true);
+        })
+        .subscribe();
+    }
 
     // Handle mobile sidebar toggle
     function toggleSidebar() {
