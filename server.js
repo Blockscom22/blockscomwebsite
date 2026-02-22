@@ -237,9 +237,9 @@ app.post('/api/pages', requireAuth, async (req, res) => {
     const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base, widget_name } = req.body;
 
     // Enforce model restrictions for FREE users
-    const FREE_MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-120b:free'];
+    const FREE_MODELS = ['arcee-ai/trinity-large-preview:free', 'stepfun/step-3.5-flash:free'];
     const resolvedModel = (req.user.profile.role === 'FREE' && !FREE_MODELS.includes(ai_model))
-      ? 'openai/gpt-oss-120b'
+      ? 'arcee-ai/trinity-large-preview:free'
       : ai_model;
 
     if (id) {
