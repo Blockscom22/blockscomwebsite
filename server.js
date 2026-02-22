@@ -374,7 +374,7 @@ app.delete('/api/knowledge/:id', requireAuth, async (req, res) => {
 
 // API: Orders (User-specific)
 app.get('/api/orders', requireAuth, async (req, res) => {
-  const query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+  const query = supabase.from('orders').select('*, fb_pages(fb_page_id)').order('created_at', { ascending: false });
   query.eq('profile_id', req.user.id);
 
   const { data, error } = await query;
@@ -1027,6 +1027,7 @@ INSTRUCTIONS:
               shipping_address: orderArgs.shipping_address,
               items: orderArgs.items,
               total_amount: orderArgs.total_amount,
+              source: 'widget',
               status: 'PENDING'
             }]);
 
@@ -1277,6 +1278,8 @@ async function processMessage(event, fbPageId) {
               shipping_address: orderArgs.shipping_address,
               items: orderArgs.items,
               total_amount: orderArgs.total_amount,
+              sender_id: senderId,
+              source: 'webhook',
               status: 'PENDING'
             }]);
 

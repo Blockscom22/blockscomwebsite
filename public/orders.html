@@ -329,6 +329,36 @@
             color: var(--danger);
         }
 
+        .badge-webhook {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .badge-widget {
+            background: rgba(139, 92, 246, 0.1);
+            color: #8b5cf6;
+        }
+
+        .conv-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            text-decoration: none;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: 0.2s;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .conv-link:hover {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
         .select-status {
             background: var(--bg);
             border: 1px solid var(--border);
@@ -446,12 +476,13 @@
                         <th>Shipping Details</th>
                         <th>Items Ordered</th>
                         <th>Total Amount</th>
+                        <th>Source</th>
                         <th style="width:150px">Status</th>
                     </tr>
                 </thead>
                 <tbody id="orders-table-body">
                     <tr>
-                        <td colspan="6" class="empty-state">Loading orders...</td>
+                        <td colspan="7" class="empty-state">Loading orders...</td>
                     </tr>
                 </tbody>
             </table>
@@ -505,7 +536,7 @@
 
                 const tbody = document.getElementById('orders-table-body');
                 if (orders.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><h3>No active orders yet</h3><p>Your AI assistant will magically put new orders here.</p></td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><h3>No active orders yet</h3><p>Your AI assistant will magically put new orders here.</p></td></tr>';
                     return;
                 }
 
@@ -513,6 +544,16 @@
                     const date = new Date(order.created_at).toLocaleString();
                     const itemsHtml = (order.items || []).map(i => `<div>${i.quantity}x ${i.name} ($${i.price})</div>`).join('');
                     const badgeClass = `badge-${(order.status || 'pending').toLowerCase()}`;
+
+                    // Build source / conversation column
+                    let sourceHtml = '';
+                    if (order.source === 'widget') {
+                        sourceHtml = '<span class="badge badge-widget">🌐 Website</span>';
+                    } else if (order.sender_id) {
+                        sourceHtml = `<a class="conv-link" href="https://www.facebook.com/messages/t/${escapeHtml(order.sender_id)}" target="_blank" rel="noopener">💬 View Conversation</a>`;
+                    } else {
+                        sourceHtml = '<span class="badge badge-webhook">📱 Messenger</span>';
+                    }
 
                     return `
             <tr>
@@ -524,6 +565,7 @@
               <td><div style="white-space:pre-wrap; max-width:250px">${escapeHtml(order.shipping_address)}</div></td>
               <td>${itemsHtml}</td>
               <td style="font-weight:700; color:var(--success)">$${order.total_amount}</td>
+              <td>${sourceHtml}</td>
               <td>
                 <div class="badge ${badgeClass}">${order.status}</div>
                 <select class="select-status" onchange="updateOrderStatus('${order.id}', this.value)">
