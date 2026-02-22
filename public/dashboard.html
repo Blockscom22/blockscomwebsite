@@ -908,6 +908,7 @@
                 <th style="white-space:nowrap">Time</th>
                 <th>Page</th>
                 <th>Owner</th>
+                <th>User ID</th>
                 <th>Type</th>
                 <th style="max-width:500px">Message</th>
               </tr>
@@ -2860,11 +2861,12 @@
       const tbody = document.getElementById('admin-logs-table');
       document.getElementById('admin-log-count').innerText = `${adminLogsCache.length} events`;
       if (!adminLogsCache || adminLogsCache.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No activity logs yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No activity logs yet.</td></tr>';
         return;
       }
       tbody.innerHTML = adminLogsCache.map((l, i) => {
         const isNew = highlight && i === 0;
+        const userId = l.fb_pages?.profile_id || '---';
         return `
           <tr class="${isNew ? 'admin-log-new' : ''}">
             <td style="color:var(--text-dim); white-space:nowrap; font-size:0.8rem">${new Date(l.created_at).toLocaleString()}</td>
@@ -2873,6 +2875,7 @@
               <div style="font-size:0.8rem">${escapeHtml(l.fb_pages?.profiles?.email || '---')}</div>
               <div style="font-size:0.65rem; color:var(--text-dim)">${escapeHtml(l.fb_pages?.profiles?.role || '')}</div>
             </td>
+            <td style="font-size:0.7rem; font-family:monospace; color:var(--text-muted); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(userId)}">${escapeHtml(userId.substring(0, 8))}...</td>
             <td><span class="badge ${l.type === 'AUTO_REPLY' ? 'badge-premium' : 'badge-free'}" style="font-size:0.65rem">${l.type}</span></td>
             <td style="max-width:500px; font-size:0.8rem; line-height:1.4">
               ${l.payload ? `
