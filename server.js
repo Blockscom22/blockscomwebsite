@@ -118,6 +118,16 @@ setInterval(() => {
   }
 }, 60000);
 
+// Page config cache for webhook (45s TTL)
+const pageCache = new Map();
+const PAGE_CACHE_TTL = 45000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of pageCache) {
+    if (now - entry.ts > PAGE_CACHE_TTL) pageCache.delete(key);
+  }
+}, 60000);
+
 // Facebook Webhook Signature Verification (X-Hub-Signature-256)
 const FB_APP_SECRET = process.env.FB_APP_SECRET || '';
 if (!FB_APP_SECRET) {
@@ -1520,19 +1530,27 @@ async function processMessage(event, fbPageId) {
   try {
     debugLog(`[DEBUG] Fetching config for Page ID: ${targetPageId}`);
     // 1. Get Page Config
-    const { data: page, error: pageError } = await supabase
-      .from('fb_pages')
-      .select('*, profiles:profile_id (*)') // Join profiles
-      .eq('fb_page_id', targetPageId)
-      .single();
+    let page;
+    const cachedPage = pageCache.get(targetPageId);
+    if (cachedPage && Date.now() - cachedPage.ts < PAGE_CACHE_TTL) {
+      page = cachedPage.data;
+    } else {
+      const { data: dbPage, error: pageError } = await supabase
+        .from('fb_pages')
+        .select('*, profiles:profile_id (*)') // Join profiles
+        .eq('fb_page_id', targetPageId)
+        .single();
 
-    if (pageError) {
-      console.error(`[ERROR] DB query failed for Page ID ${targetPageId}:`, JSON.stringify(pageError));
-      return;
-    }
-    if (!page) {
-      console.error(`[ERROR] Page not found in DB for ID ${targetPageId}`);
-      return;
+      if (pageError) {
+        console.error(`[ERROR] DB query failed for Page ID ${targetPageId}:`, JSON.stringify(pageError));
+        return;
+      }
+      if (!dbPage) {
+        console.error(`[ERROR] Page not found in DB for ID ${targetPageId}`);
+        return;
+      }
+      page = dbPage;
+      pageCache.set(targetPageId, { data: page, ts: Date.now() });
     }
 
     if (!page.is_enabled) {
@@ -1606,62 +1624,75 @@ async function processMessage(event, fbPageId) {
 
     // 3. Build Context (Knowledge Base) + 3b. Fetch Inventory — in parallel
     debugLog(`[DEBUG] Building knowledge base + inventory for user ${page.profile_id}...`);
-    let kbQuery = supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id);
 
-    // Filter by specific files if defined
-    if (Array.isArray(page.knowledge_base) && page.knowledge_base.length > 0) {
-      const kbTitles = page.knowledge_base.filter(item => typeof item === 'string');
-      if (kbTitles.length > 0) {
-        debugLog(`[DEBUG] Filtering KB by titles: ${kbTitles.join(', ')}`);
-        kbQuery = kbQuery.in('title', kbTitles);
-      }
-    }
+    // Check KB+Inventory cache first
+    const cacheKey = `webhook:${page.profile_id}`;
+    let personalityContent = '', context = '', productCatalog = "";
+    const cachedKb = kbCache.get(cacheKey);
 
-    // Run KB + inventory table fetch in parallel
-    const [kbResult, invTablesResult] = await Promise.all([
-      kbQuery,
-      supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id)
-    ]);
-
-    const kb = kbResult.data;
-    if (kbResult.error) console.error(`[ERROR] KB Query failed:`, kbResult.error);
-
-    // Always fetch PERSONALITY skill separately (it may not be in the selected KB titles)
-    let personalityContent = '';
-    const personalityInKb = (kb || []).find(k => k.title === 'PERSONALITY');
-    if (personalityInKb) {
-      personalityContent = personalityInKb.content;
+    if (cachedKb && Date.now() - cachedKb.ts < KB_CACHE_TTL) {
+      personalityContent = cachedKb.personalityContent;
+      context = cachedKb.context;
+      productCatalog = cachedKb.productCatalog;
+      debugLog(`[DEBUG] Used cached KB context + inventory catalog`);
     } else {
-      const { data: personalityEntry } = await supabase.from('knowledge_entries').select('content').eq('profile_id', page.profile_id).eq('title', 'PERSONALITY').single();
-      if (personalityEntry) personalityContent = personalityEntry.content;
-    }
+      let kbQuery = supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id);
 
-    const context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
-    debugLog(`[DEBUG] KB Context length: ${context.length} characters. Personality: ${personalityContent.length} chars`);
-
-    // Fetch all inventory rows in a single query instead of N parallel queries
-    let productCatalog = "";
-    try {
-      const invTables = invTablesResult.data;
-      if (invTables && invTables.length > 0) {
-        const tableIds = invTables.map(t => t.id);
-        const { data: allRows } = await supabase.from('inventory_rows').select('data, table_id').in('table_id', tableIds);
-        const rowsByTable = {};
-        (allRows || []).forEach(r => { (rowsByTable[r.table_id] = rowsByTable[r.table_id] || []).push(r); });
-        invTables.forEach(tbl => {
-          const invRows = rowsByTable[tbl.id] || [];
-          if (invRows.length > 0) {
-            const cols = tbl.columns || [];
-            productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
-              return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
-            }).join('\n');
-          }
-        });
+      // Filter by specific files if defined
+      if (Array.isArray(page.knowledge_base) && page.knowledge_base.length > 0) {
+        const kbTitles = page.knowledge_base.filter(item => typeof item === 'string');
+        if (kbTitles.length > 0) {
+          debugLog(`[DEBUG] Filtering KB by titles: ${kbTitles.join(', ')}`);
+          kbQuery = kbQuery.in('title', kbTitles);
+        }
       }
-    } catch (invErr) {
-      console.warn('[WARN] Inventory query failed:', invErr.message);
+
+      // Run KB + inventory table fetch in parallel
+      const [kbResult, invTablesResult] = await Promise.all([
+        kbQuery,
+        supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id)
+      ]);
+
+      const kb = kbResult.data;
+      if (kbResult.error) console.error(`[ERROR] KB Query failed:`, kbResult.error);
+
+      // Always fetch PERSONALITY skill separately (it may not be in the selected KB titles)
+      const personalityInKb = (kb || []).find(k => k.title === 'PERSONALITY');
+      if (personalityInKb) {
+        personalityContent = personalityInKb.content;
+      } else {
+        const { data: personalityEntry } = await supabase.from('knowledge_entries').select('content').eq('profile_id', page.profile_id).eq('title', 'PERSONALITY').single();
+        if (personalityEntry) personalityContent = personalityEntry.content;
+      }
+
+      context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
+      debugLog(`[DEBUG] KB Context length: ${context.length} characters. Personality: ${personalityContent.length} chars`);
+
+      // Fetch all inventory rows in a single query instead of N parallel queries
+      try {
+        const invTables = invTablesResult.data;
+        if (invTables && invTables.length > 0) {
+          const tableIds = invTables.map(t => t.id);
+          const { data: allRows } = await supabase.from('inventory_rows').select('data, table_id').in('table_id', tableIds);
+          const rowsByTable = {};
+          (allRows || []).forEach(r => { (rowsByTable[r.table_id] = rowsByTable[r.table_id] || []).push(r); });
+          invTables.forEach(tbl => {
+            const invRows = rowsByTable[tbl.id] || [];
+            if (invRows.length > 0) {
+              const cols = tbl.columns || [];
+              productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
+                return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
+              }).join('\n');
+            }
+          });
+        }
+      } catch (invErr) {
+        console.warn('[WARN] Inventory query failed:', invErr.message);
+      }
+      debugLog(`[DEBUG] Inventory catalog length: ${productCatalog.length} chars`);
+
+      kbCache.set(cacheKey, { personalityContent, context, productCatalog, ts: Date.now() });
     }
-    debugLog(`[DEBUG] Inventory catalog length: ${productCatalog.length} chars`);
 
     // 4. Get AI Response
     debugLog(`[DEBUG] Requesting AI completion from OpenRouter (${page.ai_model || 'default'})...`);
