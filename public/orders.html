@@ -579,6 +579,9 @@
     <script>
         const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         let currentSession = null;
+        const CURRENCY_SYMBOLS = { USD: '$', PHP: '₱', EUR: '€', GBP: '£', JPY: '¥' };
+        let userCurrency = 'PHP';
+        let currencySymbol = '₱';
 
         async function init() {
             const { data } = await sb.auth.getSession();
@@ -596,6 +599,10 @@
                     document.getElementById('u-tier').innerText = `${cachedMe.role} TIER`;
                     document.getElementById('u-credits').innerText = `${(cachedMe.credits || 0).toLocaleString()} Credits`;
                     if (cachedMe.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+                    if (cachedMe.currency) {
+                        userCurrency = cachedMe.currency;
+                        currencySymbol = CURRENCY_SYMBOLS[userCurrency] || userCurrency;
+                    }
                 } catch (e) { }
             }
 
@@ -611,6 +618,12 @@
                     document.getElementById('u-tier').innerText = `${me.role} TIER`;
                     document.getElementById('u-credits').innerText = `${(me.credits || 0).toLocaleString()} Credits`;
                     if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+
+                    if (me.currency && me.currency !== userCurrency) {
+                        userCurrency = me.currency;
+                        currencySymbol = CURRENCY_SYMBOLS[userCurrency] || userCurrency;
+                        loadOrders();
+                    }
                 })
                 .catch(console.error);
         }
@@ -628,7 +641,7 @@
 
                 tbody.innerHTML = orders.map(order => {
                     const date = new Date(order.created_at).toLocaleString();
-                    const itemsHtml = (order.items || []).map(i => `<div>${i.quantity}x ${i.name} ($${i.price})</div>`).join('');
+                    const itemsHtml = (order.items || []).map(i => `<div>${i.quantity}x ${i.name} (${currencySymbol}${i.price})</div>`).join('');
                     const badgeClass = `badge-${(order.status || 'pending').toLowerCase()}`;
 
                     // Build source / conversation column
@@ -655,7 +668,7 @@
               </td>
               <td data-label="Shipping"><div style="white-space:pre-wrap; max-width:250px">${escapeHtml(order.shipping_address)}</div></td>
               <td data-label="Items">${itemsHtml}</td>
-              <td data-label="Total" style="font-weight:700; color:var(--success)">$${order.total_amount}</td>
+              <td data-label="Total" style="font-weight:700; color:var(--success)">${currencySymbol}${order.total_amount}</td>
               <td data-label="Source">${sourceHtml}</td>
               <td data-label="Status">
                 <div class="badge ${badgeClass}">${order.status}</div>
