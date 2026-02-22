@@ -284,11 +284,19 @@
     if (!text) return;
     input.value = '';
     push('user', text);
+
+    // Get or create session ID for memory tracking
+    let sessionId = localStorage.getItem('bc_session_id');
+    if (!sessionId) {
+      sessionId = 'sess_' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('bc_session_id', sessionId);
+    }
+
     try {
       const r = await fetch(`${apiBase}/api/widget/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, message: text })
+        body: JSON.stringify({ key, message: text, session_id: sessionId })
       });
       const j = await r.json();
       push('bot', j.reply || j.error || 'No response', j.products || []);

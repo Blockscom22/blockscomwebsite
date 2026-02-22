@@ -1252,8 +1252,10 @@ app.get('/api/widget/config', rateLimit(60000, 30), async (req, res) => {
 
 app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
   try {
-    const { key, message } = req.body || {};
+    const { key, message, session_id } = req.body || {};
     if (!key || !message) return res.status(400).json({ error: 'missing key/message' });
+
+    const sessionId = session_id || 'anonymous';
 
     const { data: page, error } = await supabase
       .from('fb_pages')
@@ -1338,11 +1340,24 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
     const resolvedApiKey = process.env.OPENROUTER_API_KEY;
     if (!resolvedApiKey) return res.status(500).json({ error: 'missing OpenRouter key' });
 
-    const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: page.ai_model || 'arcee-ai/trinity-large-preview:free',
-      messages: [
-        {
-          role: 'system', content: `You are Blockscom website assistant for ${page.name}. 
+    // Fetch memory (last 10 messages)
+    const { data: memoryLogs } = await supabase
+      .from('chat_memory')
+      .select('role, content')
+      .eq('fb_page_id', page.id)
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    // Sort ascending for chronological order
+    const priorMessages = (memoryLogs || []).reverse().map(log => ({
+      role: log.role,
+      content: log.content
+    }));
+
+    const aiMessages = [
+      {
+        role: 'system', content: `You are Blockscom website assistant for ${page.name}. 
 
 PERSONALITY / TONE:
 ${personalityContent}
@@ -1360,8 +1375,13 @@ INSTRUCTIONS:
 - IMPORTANT: When listing products, format them using Markdown (e.g., bullet points and **bold** text) for better readability.
 - Add line breaks between distinct items so it does not look like a wall of text.
 - If a customer wants to place an order, ask for their name, contact info, and shipping address. Once provided, use the place_order tool.` },
-        { role: 'user', content: String(message) }
-      ],
+      ...priorMessages,
+      { role: 'user', content: String(message) }
+    ];
+
+    const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+      model: page.ai_model || 'arcee-ai/trinity-large-preview:free',
+      messages: aiMessages,
       tools: [{
         type: "function",
         function: {
@@ -1429,7 +1449,14 @@ INSTRUCTIONS:
       reply = 'Thanks! Can you share more details?';
     }
 
-    await supabase.from('activity_logs').insert([{ fb_page_id: page.id, type: 'WIDGET_REPLY', payload: { in: message, out: reply } }]);
+    // Save memory & logs
+    await Promise.all([
+      supabase.from('activity_logs').insert([{ fb_page_id: page.id, type: 'WIDGET_REPLY', payload: { in: message, out: reply } }]),
+      supabase.from('chat_memory').insert([
+        { fb_page_id: page.id, session_id: sessionId, role: 'user', content: message },
+        { fb_page_id: page.id, session_id: sessionId, role: 'assistant', content: reply }
+      ])
+    ]);
 
     // Deduct 1 credit atomically for widget replies
     if (userProfile && userProfile.role !== 'ADMIN') {
@@ -1642,36 +1669,54 @@ async function processMessage(event, fbPageId) {
     const fbUserCurrency = userProfile?.currency || 'PHP';
     const fbCurrencySymbol = CURRENCY_SYMBOLS[fbUserCurrency] || fbUserCurrency;
 
+    // Fetch memory (last 10 messages)
+    const { data: memoryLogs } = await supabase
+      .from('chat_memory')
+      .select('role, content')
+      .eq('fb_page_id', page.id)
+      .eq('session_id', senderId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    // Sort ascending for chronological order
+    const priorMessages = (memoryLogs || []).reverse().map(log => ({
+      role: log.role,
+      content: log.content
+    }));
+
+    const aiMessages = [
+      {
+        role: 'system',
+        content: `You are a helpful AI assistant for the Facebook page "${page.name}".
+        
+        PERSONALITY / TONE:
+        ${personalityContent}
+        
+        DEFAULT CURRENCY: ${fbUserCurrency} (${fbCurrencySymbol})
+        - Always display all prices and monetary values in ${fbUserCurrency} (${fbCurrencySymbol}).
+        - This is the store's default currency. Do not use any other currency unless the customer explicitly asks.
+        
+        KNOWLEDGE BASE:
+        ${context}
+        ${productCatalog}
+        
+        INSTRUCTIONS:
+        - Answer based on the knowledge base and product catalog if relevant.
+        - If a user asks about products or pricing, ONLY recommend the specific items listed in the PRODUCT CATALOG above. Do not invent products.
+        - IMPORTANT: When listing products, use clear formatting (bullet points, double newlines for spacing, and asterisks for basic bolding) to organize the text neatly.
+        - Keep answers concise for chat.
+        - If a customer wants to place an order, ask for their name, contact info, and shipping address. Once provided, use the place_order tool.
+        `
+      },
+      ...priorMessages,
+      { role: 'user', content: messageText }
+    ];
+
     const aiRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
         model: page.ai_model || 'arcee-ai/trinity-large-preview:free', // Fallback model
-        messages: [
-          {
-            role: 'system',
-            content: `You are a helpful AI assistant for the Facebook page "${page.name}".
-            
-            PERSONALITY / TONE:
-            ${personalityContent}
-            
-            DEFAULT CURRENCY: ${fbUserCurrency} (${fbCurrencySymbol})
-            - Always display all prices and monetary values in ${fbUserCurrency} (${fbCurrencySymbol}).
-            - This is the store's default currency. Do not use any other currency unless the customer explicitly asks.
-            
-            KNOWLEDGE BASE:
-            ${context}
-            ${productCatalog}
-            
-            INSTRUCTIONS:
-            - Answer based on the knowledge base and product catalog if relevant.
-            - If a user asks about products or pricing, ONLY recommend the specific items listed in the PRODUCT CATALOG above. Do not invent products.
-            - IMPORTANT: When listing products, use clear formatting (bullet points, double newlines for spacing, and asterisks for basic bolding) to organize the text neatly.
-            - Keep answers concise for chat.
-            - If a customer wants to place an order, ask for their name, contact info, and shipping address. Once provided, use the place_order tool.
-            `
-          },
-          { role: 'user', content: messageText }
-        ],
+        messages: aiMessages,
         tools: [{
           type: "function",
           function: {
@@ -1843,11 +1888,17 @@ async function processMessage(event, fbPageId) {
     }
 
     // 6. Log & Deduct Credits
-    await supabase.from('activity_logs').insert([{
-      fb_page_id: page.id,
-      type: 'AUTO_REPLY',
-      payload: { in: messageText, out: replyText, sender: senderId }
-    }]);
+    await Promise.all([
+      supabase.from('activity_logs').insert([{
+        fb_page_id: page.id,
+        type: 'AUTO_REPLY',
+        payload: { in: messageText, out: replyText, sender: senderId }
+      }]),
+      supabase.from('chat_memory').insert([
+        { fb_page_id: page.id, session_id: senderId, role: 'user', content: messageText },
+        { fb_page_id: page.id, session_id: senderId, role: 'assistant', content: replyText }
+      ])
+    ]);
 
     if (userProfile && userProfile.role !== 'ADMIN') {
       try {
