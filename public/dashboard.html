@@ -2196,9 +2196,8 @@
       let selected = new Set();
 
       if (id) {
-        const res = await fetch('/api/pages', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
-        const pages = await res.json();
-        const p = pages.find(p => p.id === id);
+        // Use cached pages data for instant modal opening (no API call)
+        const p = pagesCache.find(p => p.id === id);
         if (p) {
           document.getElementById('p-name').value = p.name;
           document.getElementById('p-widget-name').value = p.widget_name || '';
