@@ -5,12 +5,27 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
+// Environment
+const IS_PROD = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+function debugLog(...args) { if (!IS_PROD) console.log(...args); }
+
 const app = express();
 
-// CORS (needed for embeddable widget from Shopify/custom sites/file previews)
+// CORS — allow known domains + widget origins
+const ALLOWED_ORIGINS = [
+  'https://www.blockscom.xyz',
+  'https://blockscom.xyz',
+  'http://localhost:3000',
+  'http://localhost:10000'
+];
+
 app.use((req, res, next) => {
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin === 'null' ? '*' : origin);
+  const origin = req.headers.origin || '';
+  // Allow listed origins OR any origin for the widget/webhook public endpoints
+  const isPublicPath = req.path.startsWith('/api/widget') || req.path.startsWith('/webhook') || req.path.startsWith('/blockscom-chat');
+  if (ALLOWED_ORIGINS.includes(origin) || isPublicPath) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -43,8 +58,34 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // Secret encryption helpers (AES-256-GCM)
 const ENC_KEY = crypto.createHash('sha256').update(process.env.TOKEN_ENCRYPTION_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'blockscom-default-key').digest();
 if (!process.env.TOKEN_ENCRYPTION_KEY) {
-  console.warn("SECURITY WARNING: TOKEN_ENCRYPTION_KEY is not set. Falling back to SUPABASE_SERVICE_ROLE_KEY or default string for encryption. It is recommended to set a dedicated TOKEN_ENCRYPTION_KEY in production.");
+  console.warn("SECURITY WARNING: TOKEN_ENCRYPTION_KEY is not set. Falling back to SUPABASE_SERVICE_ROLE_KEY or default string for encryption. Set a dedicated TOKEN_ENCRYPTION_KEY in production.");
 }
+
+// Simple in-memory rate limiter for public endpoints
+const rateLimitMap = new Map();
+function rateLimit(windowMs, maxRequests) {
+  return (req, res, next) => {
+    const key = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    const now = Date.now();
+    const entry = rateLimitMap.get(key);
+    if (!entry || now - entry.start > windowMs) {
+      rateLimitMap.set(key, { start: now, count: 1 });
+      return next();
+    }
+    entry.count++;
+    if (entry.count > maxRequests) {
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+}
+// Clean up rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitMap) {
+    if (now - entry.start > 300000) rateLimitMap.delete(key);
+  }
+}, 300000);
 
 function encryptSecret(plain) {
   if (!plain) return null;
@@ -66,10 +107,10 @@ function decryptSecret(value) {
   }
   try {
     const parts = String(value).split(':');
-    console.log(`[DEBUG] decryptSecret: Splitting value into ${parts.length} parts`);
+    debugLog(`[DEBUG] decryptSecret: Splitting value into ${parts.length} parts`);
     const [, ivB64, tagB64, dataB64] = parts;
     if (!ivB64 || !tagB64 || !dataB64) {
-      console.error('[ERROR] decryptSecret: Missing parts', { iv: !!ivB64, tag: !!tagB64, data: !!dataB64 });
+      console.error('[ERROR] decryptSecret: Missing parts');
       return '';
     }
     const iv = Buffer.from(ivB64, 'base64');
@@ -79,7 +120,7 @@ function decryptSecret(value) {
     decipher.setAuthTag(tag);
     const dec = Buffer.concat([decipher.update(data), decipher.final()]);
     const result = dec.toString('utf8');
-    console.log(`[DEBUG] decryptSecret: Decryption successful, result length: ${result.length}`);
+    debugLog(`[DEBUG] decryptSecret: Decryption successful, result length: ${result.length}`);
     return result;
   } catch (err) {
     console.error('[ERROR] Decryption failed:', err.message);
@@ -130,10 +171,12 @@ app.get('/fb-setup-docs.html', (req, res) => res.sendFile(path.join(__dirname, '
 // API: Get Current User
 app.get('/api/me', requireAuth, (req, res) => res.json(req.user.profile));
 
-// API: Update User PIN
+// API: Update User PIN (hashed)
 app.put('/api/me/pin', requireAuth, async (req, res) => {
   const { pin } = req.body;
-  const { error } = await supabase.from('profiles').update({ pin_code: pin }).eq('id', req.user.id);
+  if (!pin || pin.length < 6) return res.status(400).json({ error: 'PIN must be at least 6 digits.' });
+  const hashedPin = crypto.createHash('sha256').update(String(pin)).digest('hex');
+  const { error } = await supabase.from('profiles').update({ pin_code: hashedPin }).eq('id', req.user.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
@@ -186,8 +229,8 @@ app.post('/api/pages', requireAuth, async (req, res) => {
       const { error } = await supabase.from('fb_pages').update(updates).eq('id', id).eq('profile_id', req.user.id);
       if (error) throw error;
     } else {
-      // Insert
-      const { error } = await supabase.from('fb_pages').insert([{
+      // Insert — return the new row so the client gets the real system ID
+      const { data: newPage, error } = await supabase.from('fb_pages').insert([{
         profile_id: req.user.id,
         name,
         fb_page_id,
@@ -197,8 +240,9 @@ app.post('/api/pages', requireAuth, async (req, res) => {
         knowledge_base: knowledge_base || [],
         widget_name,
         widget_key: crypto.randomBytes(12).toString('hex')
-      }]);
+      }]).select().single();
       if (error) throw error;
+      return res.json({ success: true, id: newPage.id, widget_key: newPage.widget_key });
     }
 
     res.json({ success: true });
@@ -395,7 +439,7 @@ RULES:
       headers: {
         'Authorization': `Bearer ${resolvedApiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://blockscom.ai',
+        'HTTP-Referer': 'https://www.blockscom.xyz',
         'X-Title': 'Blockscom AI'
       }
     });
@@ -547,16 +591,17 @@ Please format nicely with headers and bullet points.`
       headers: {
         'Authorization': `Bearer ${resolvedApiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://blockscom.ai',
+        'HTTP-Referer': 'https://www.blockscom.xyz',
         'X-Title': 'Blockscom AI'
       }
     });
 
     const report = aiRes.data?.choices?.[0]?.message?.content || 'Unable to generate analysis at this time.';
 
-    // Deduct 2 credits
+    // Deduct 2 credits (floor at 0)
     if (req.user.profile.role !== 'ADMIN') {
-      await supabase.from('profiles').update({ credits: (req.user.profile.credits || 0) - 2 }).eq('id', req.user.id);
+      const newCredits = Math.max(0, (req.user.profile.credits || 0) - 2);
+      await supabase.from('profiles').update({ credits: newCredits }).eq('id', req.user.id);
     }
 
     res.json({ success: true, report });
@@ -572,7 +617,7 @@ Please format nicely with headers and bullet points.`
 
 // ==================== WEBSITE WIDGET API (Shopify/HTML Plugin) ====================
 
-app.get('/api/widget/config', async (req, res) => {
+app.get('/api/widget/config', rateLimit(60000, 30), async (req, res) => {
   const key = String(req.query.key || '');
   if (!key) return res.status(400).json({ error: 'missing key' });
 
@@ -587,7 +632,7 @@ app.get('/api/widget/config', async (req, res) => {
   res.json({ ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'), theme: page.widget_theme || 'default' });
 });
 
-app.post('/api/widget/message', async (req, res) => {
+app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
   try {
     const { key, message } = req.body || {};
     if (!key || !message) return res.status(400).json({ error: 'missing key/message' });
@@ -762,15 +807,15 @@ async function checkDailyLimit(profileId, role) {
 
 // Helper to process a single message event
 async function processMessage(event, fbPageId) {
-  console.log('--- START PROCESS MESSAGE ---');
+  debugLog('--- START PROCESS MESSAGE ---');
   const senderId = event.sender.id;
   const messageText = event.message.text;
   const targetPageId = String(fbPageId);
 
-  console.log(`[DEBUG] Processing message from ${senderId} to Page ID ${targetPageId}`);
+  debugLog(`[DEBUG] Processing message from ${senderId} to Page ID ${targetPageId}`);
 
   try {
-    console.log(`[DEBUG] Fetching config for Page ID: ${targetPageId}`);
+    debugLog(`[DEBUG] Fetching config for Page ID: ${targetPageId}`);
     // 1. Get Page Config
     const { data: page, error: pageError } = await supabase
       .from('fb_pages')
@@ -788,26 +833,26 @@ async function processMessage(event, fbPageId) {
     }
 
     if (!page.is_enabled) {
-      console.log(`[DEBUG] Page ${page.name} (ID: ${targetPageId}) is disabled. Skipping message.`);
+      debugLog(`[DEBUG] Page ${page.name} (ID: ${targetPageId}) is disabled. Skipping message.`);
       return;
     }
 
     const userProfile = page.profiles;
-    console.log(`[DEBUG] Found page: ${page.name}. Credits: ${userProfile?.credits}, Role: ${userProfile?.role}`);
+    debugLog(`[DEBUG] Found page: ${page.name}. Credits: ${userProfile?.credits}, Role: ${userProfile?.role}`);
 
     if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) <= 0) {
-      console.log(`[DEBUG] User ${userProfile.email} out of credits.`);
+      debugLog(`[DEBUG] User ${userProfile.email} out of credits.`);
       return;
     }
 
     const canReply = await checkDailyLimit(page.profile_id, userProfile?.role || 'FREE');
     if (!canReply) {
-      console.log(`[DEBUG] User ${userProfile?.email} reached their daily limit.`);
+      debugLog(`[DEBUG] User ${userProfile?.email} reached their daily limit.`);
       return;
     }
 
     // 3. Build Context (Knowledge Base)
-    console.log(`[DEBUG] Building knowledge base for user ${page.profile_id}...`);
+    debugLog(`[DEBUG] Building knowledge base for user ${page.profile_id}...`);
     let kbQuery = supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id);
 
     // Filter by specific files if defined
@@ -823,7 +868,7 @@ async function processMessage(event, fbPageId) {
       });
 
       if (kbTitles.length > 0) {
-        console.log(`[DEBUG] Filtering KB by titles: ${kbTitles.join(', ')}`);
+        debugLog(`[DEBUG] Filtering KB by titles: ${kbTitles.join(', ')}`);
         kbQuery = kbQuery.in('title', kbTitles);
       } else {
         // If they ONLY selected products, we shouldn't fetch all KB, we should fetch none
@@ -834,10 +879,10 @@ async function processMessage(event, fbPageId) {
     const { data: kb, error: kbError } = await kbQuery;
     if (kbError) console.error(`[ERROR] KB Query failed:`, kbError);
     const context = (kb || []).map(k => k.content).join('\n\n');
-    console.log(`[DEBUG] KB Context length: ${context.length} characters.`);
+    debugLog(`[DEBUG] KB Context length: ${context.length} characters.`);
 
     // 3b. Fetch Product Catalog
-    console.log(`[DEBUG] Fetching product catalog for user ${page.profile_id}...`);
+    debugLog(`[DEBUG] Fetching product catalog for user ${page.profile_id}...`);
     let prodQuery = supabase
       .from('products')
       .select('*')
@@ -846,7 +891,7 @@ async function processMessage(event, fbPageId) {
       .eq('is_sellable', true); // Only fetch sellable products for AI
 
     if (selectedProducts.length > 0 || selectedCategories.length > 0) {
-      console.log(`[DEBUG] Filtering products: ${selectedProducts.length} specific, ${selectedCategories.length} categories`);
+      debugLog(`[DEBUG] Filtering products: ${selectedProducts.length} specific, ${selectedCategories.length} categories`);
       // We need an OR condition: name in selectedProducts OR category in selectedCategories
       let orConditions = [];
       if (selectedProducts.length > 0) orConditions.push(`name.in.("${selectedProducts.join('","')}")`);
@@ -864,10 +909,10 @@ async function processMessage(event, fbPageId) {
         `- ${p.name}: ${p.description} (Price: $${p.price}, Stock: ${p.stock_quantity})`
       ).join('\n');
     }
-    console.log(`[DEBUG] Product catalog items found: ${products?.length || 0}`);
+    debugLog(`[DEBUG] Product catalog items found: ${products?.length || 0}`);
 
     // 4. Get AI Response
-    console.log(`[DEBUG] Requesting AI completion from OpenRouter (${page.ai_model || 'default'})...`);
+    debugLog(`[DEBUG] Requesting AI completion from OpenRouter (${page.ai_model || 'default'})...`);
     // Decrypt keys
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const pageAccessToken = decryptSecret(page.access_token);
@@ -939,7 +984,7 @@ async function processMessage(event, fbPageId) {
         headers: {
           'Authorization': `Bearer ${openRouterKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://blockscom.ai', // OpenRouter requirements
+          'HTTP-Referer': 'https://www.blockscom.xyz', // OpenRouter requirements
           'X-Title': 'Blockscom AI'
         }
       }
@@ -979,10 +1024,10 @@ async function processMessage(event, fbPageId) {
     } else if (!replyText) {
       replyText = "I'm not sure how to respond to that.";
     }
-    console.log(`[DEBUG] AI Reply: ${replyText.substring(0, 50)}...`);
+    debugLog(`[DEBUG] AI Reply: ${replyText.substring(0, 50)}...`);
 
     // 5. Send Reply to Facebook
-    console.log(`[DEBUG] Sending reply to FB recipient ${senderId}...`);
+    debugLog(`[DEBUG] Sending reply to FB recipient ${senderId}...`);
     const fbRes = await axios.post(
       `https://graph.facebook.com/v22.0/me/messages`,
       {
@@ -993,7 +1038,7 @@ async function processMessage(event, fbPageId) {
         params: { access_token: pageAccessToken }
       }
     );
-    console.log(`[DEBUG] Facebook API status: ${fbRes.status}`);
+    debugLog(`[DEBUG] Facebook API status: ${fbRes.status}`);
 
     // 6. Log & Deduct Credits
     await supabase.from('activity_logs').insert([{
@@ -1003,7 +1048,8 @@ async function processMessage(event, fbPageId) {
     }]);
 
     if (userProfile && userProfile.role !== 'ADMIN') {
-      await supabase.from('profiles').update({ credits: (userProfile.credits || 0) - 1 }).eq('id', page.profile_id);
+      const newCredits = Math.max(0, (userProfile.credits || 0) - 1);
+      await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
     }
 
   } catch (err) {

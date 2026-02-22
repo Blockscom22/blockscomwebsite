@@ -20,5 +20,5 @@ function decryptSecret(value) {
     }
 }
 
-const key = "enc:coqTyNa0VRYZQ+fq:e17dl1sLSFg9RLnQYbg9Gw==:+45Rti/his1nfJxd83gIX+KtykK8/HQGMMlrtBxLdCL2s67IwaqwP8s85Dyl9wP1KWksRy2eT9NVZS/3qLVN44jQLovE5MU1Sg==";
+const key = "enc:REPLACE_WITH_YOUR_ENCRYPTED_VALUE_FOR_TESTING";
 console.log("TEST RESULT:", decryptSecret(key));

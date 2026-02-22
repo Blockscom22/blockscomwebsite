@@ -1215,7 +1215,7 @@
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
-            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">https://www.blockscom.xyz/webhook?page=${p.id}</code>
+            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">${window.location.origin}/webhook?page=${p.id}</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
@@ -1786,8 +1786,14 @@
     }
 
     function updateWebhookUrl(systemId) {
-      const baseUrl = 'https://www.blockscom.xyz/webhook';
-      document.getElementById('modal-webhook-link').innerText = systemId ? `${baseUrl}?page=${systemId}` : baseUrl;
+      if (!systemId || systemId.startsWith('temp-')) {
+        document.getElementById('modal-webhook-link').innerText = 'Save configuration first to generate your Webhook URL';
+        document.getElementById('modal-webhook-link').style.color = 'var(--text-dim)';
+        return;
+      }
+      const baseUrl = window.location.origin + '/webhook';
+      document.getElementById('modal-webhook-link').innerText = `${baseUrl}?page=${systemId}`;
+      document.getElementById('modal-webhook-link').style.color = 'var(--text)';
     }
 
     function copyWebhookLink(btn) {
@@ -1975,8 +1981,15 @@
       renderPagesList();
 
       fetch('/api/pages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` }, body: JSON.stringify(body) })
-        .then(res => {
+        .then(async res => {
           if (!res.ok) throw new Error('Failed to save');
+          const result = await res.json();
+          // If this was a new page, show the real webhook URL
+          if (result.id) {
+            const webhookUrl = `${window.location.origin}/webhook?page=${result.id}`;
+            alert('Webhook created successfully!\n\nYour Webhook URL (paste this into Facebook):\n' + webhookUrl);
+          }
+          pagesLoaded = false;
           loadPages();
         })
         .catch(err => alert('Error saving page: ' + err.message));

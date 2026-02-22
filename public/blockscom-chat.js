@@ -1,7 +1,7 @@
 (function () {
   const script = document.currentScript;
   const key = script?.getAttribute('data-key');
-  const apiBase = script?.getAttribute('data-api') || 'https://webhook.ramilflaviano.art';
+  const apiBase = script?.getAttribute('data-api') || 'https://www.blockscom.xyz';
 
   if (!key) {
     console.error('[Blockscom Chat] Missing data-key');
