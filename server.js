@@ -1202,36 +1202,31 @@ app.get('/webhook', async (req, res) => {
 
 app.post('/webhook', async (req, res) => {
   const body = req.body;
-  // page_id is in req.params.page_id, but the payload 'entry.id' always contains the receiving Page ID anyway, so we just process it normally.
+  console.log('[WEBHOOK POST] Received:', JSON.stringify(body?.object), 'entries:', body?.entry?.length || 0);
 
   if (body.object === 'page') {
-    let promises = [];
+    // CRITICAL: Respond to Facebook IMMEDIATELY — they timeout after 5 seconds
+    res.status(200).send('EVENT_RECEIVED');
 
-    for (const entry of body.entry) {
-      // Get the page ID from the entry
+    // Process messages after response (Vercel keeps the function alive briefly after response)
+    for (const entry of (body.entry || [])) {
       const fbPageId = entry.id;
+      console.log(`[WEBHOOK] Processing entry for FB Page ID: ${fbPageId}`);
 
-      // Handle messaging events
       if (entry.messaging) {
         for (const event of entry.messaging) {
           if (event.message && event.message.text) {
-            // Process in background (async)
-            promises.push(processMessage(event, fbPageId));
+            try {
+              await processMessage(event, fbPageId);
+            } catch (err) {
+              console.error(`[WEBHOOK ERROR] processMessage failed for Page ${fbPageId}:`, err.message);
+            }
           }
         }
       }
     }
-
-    try {
-      // We MUST await all promises before sending the response on Vercel
-      // Otherwise the serverless function terminates immediately and kills the background tasks.
-      await Promise.all(promises);
-      res.status(200).send('EVENT_RECEIVED'); // Ack to Facebook AFTER processing
-    } catch (e) {
-      console.error("Error processing webhooks:", e);
-      res.status(500).send('ERROR');
-    }
   } else {
+    console.warn('[WEBHOOK POST] Unknown object type:', body?.object);
     res.sendStatus(404);
   }
 });

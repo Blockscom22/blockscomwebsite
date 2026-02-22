@@ -572,8 +572,9 @@
       <div class="user-credits-container">
         <div class="credits-label">Balance</div>
         <div id="u-credits" class="credits-amount">0 Credits</div>
-        <div style="font-size:0.65rem; color:var(--text-dim); margin-top:2px; opacity:0.7">1 reply = 1 credit</div>
       </div>
+      <div style="font-size:0.65rem; color:var(--text-dim); text-align:center; margin-top:6px; opacity:0.7">1 reply = 1
+        credit</div>
       <button onclick="logout()" class="btn-logout">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -1507,10 +1508,15 @@
     }
 
     function showView(view) {
+      // Guard: only ADMIN can access the admin view
+      if (view === 'admin' && (!me || me.role !== 'ADMIN')) {
+        view = 'pages';
+      }
       document.querySelectorAll('.view-section').forEach(d => d.style.display = 'none');
       document.getElementById('view-' + view).style.display = 'block';
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      const nav = document.getElementById('nav-' + (view === 'admin' ? 'admin-nav' : view));
+      const navId = view === 'admin' ? 'admin-nav' : 'nav-' + view;
+      const nav = document.getElementById(navId);
       if (nav) nav.classList.add('active');
       if (view === 'admin') loadAdminUsers();
       if (view === 'kb') loadKb();
