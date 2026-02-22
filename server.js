@@ -649,12 +649,22 @@ app.get('/api/logs/stats', requireAuth, async (req, res) => {
 // API: Analyze Logs
 app.post('/api/logs/analyze', requireAuth, async (req, res) => {
   try {
-    const query = supabase.from('activity_logs').select('*, fb_pages(name, profile_id)').order('created_at', { ascending: false }).limit(50);
-    const { data, error } = await query;
-    if (error) throw error;
-
-    // Authorization filter
-    const relevantLogs = data.filter(l => req.user.profile.role === 'ADMIN' || l.fb_pages?.profile_id === req.user.id);
+    // Filter logs at DB level for data isolation (admins see all)
+    let relevantLogs;
+    if (req.user.profile.role === 'ADMIN') {
+      const { data, error } = await supabase.from('activity_logs').select('*, fb_pages(name, profile_id)').order('created_at', { ascending: false }).limit(50);
+      if (error) throw error;
+      relevantLogs = data;
+    } else {
+      const { data: userPages } = await supabase.from('fb_pages').select('id').eq('profile_id', req.user.id);
+      if (!userPages || userPages.length === 0) {
+        return res.status(400).json({ error: "No chat logs available to analyze." });
+      }
+      const pageIds = userPages.map(p => p.id);
+      const { data, error } = await supabase.from('activity_logs').select('*, fb_pages(name, profile_id)').in('fb_page_id', pageIds).order('created_at', { ascending: false }).limit(50);
+      if (error) throw error;
+      relevantLogs = data;
+    }
     if (!relevantLogs || relevantLogs.length === 0) {
       return res.status(400).json({ error: "No chat logs available to analyze." });
     }
@@ -706,10 +716,9 @@ Please format nicely with headers and bullet points.`
 
     const report = aiRes.data?.choices?.[0]?.message?.content || 'Unable to generate analysis at this time.';
 
-    // Deduct 2 credits (floor at 0)
+    // Deduct 2 credits atomically (floor at 0)
     if (req.user.profile.role !== 'ADMIN') {
-      const newCredits = Math.max(0, (req.user.profile.credits || 0) - 2);
-      await supabase.from('profiles').update({ credits: newCredits }).eq('id', req.user.id);
+      await supabase.rpc('deduct_credits', { user_id: req.user.id, amount: 2 }).single();
     }
 
     res.json({ success: true, report });
@@ -883,6 +892,11 @@ INSTRUCTIONS:
     }
 
     await supabase.from('activity_logs').insert([{ fb_page_id: page.id, type: 'WIDGET_REPLY', payload: { in: message, out: reply } }]);
+
+    // Deduct 1 credit atomically for widget replies
+    if (userProfile && userProfile.role !== 'ADMIN') {
+      await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
+    }
 
     res.json({ ok: true, reply, products: products || [] });
   } catch (e) {
@@ -1161,8 +1175,7 @@ async function processMessage(event, fbPageId) {
     }]);
 
     if (userProfile && userProfile.role !== 'ADMIN') {
-      const newCredits = Math.max(0, (userProfile.credits || 0) - 1);
-      await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
+      await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
     }
 
   } catch (err) {

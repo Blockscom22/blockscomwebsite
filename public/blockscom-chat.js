@@ -256,7 +256,12 @@
         const card = document.createElement('div');
         card.className = 'bc-card';
         // Use placeholder or actual base64 local crop
-        const imgSrc = p.image_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" style="background:%23f4f4f4"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%23ccc">No Image</text></svg>';
+        const rawUrl = p.image_url || '';
+        // Sanitize image URL: only allow data: and https: protocols, escape quotes
+        let imgSrc = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" style="background:%23f4f4f4"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="%23ccc">No Image</text></svg>';
+        if (rawUrl && (rawUrl.startsWith('https://') || rawUrl.startsWith('data:'))) {
+          imgSrc = rawUrl.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         card.innerHTML = `
           <img src="${imgSrc}" alt="Product">
