@@ -2,8 +2,12 @@ const express = require('express');
 const axios = require('axios');
 const path = require('path');
 const crypto = require('crypto');
+const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
+
+// Multer — memory storage for image uploads (max 5MB)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Environment
 const IS_PROD = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
@@ -715,6 +719,157 @@ Rules:
     console.error('Inventory Import Error:', error.message);
     res.status(500).json({ error: 'Failed to process file.' });
   }
+});
+
+// ==================== USER IMAGES ====================
+
+// Helper: role-based image limits
+const IMAGE_LIMITS = { FREE: 3, PREMIUM: 50, ENTERPRISE: 999999, ADMIN: 999999 };
+
+// API: List user's images
+app.get('/api/images', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('user_images').select('*').eq('profile_id', req.user.id).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const role = req.user.profile.role || 'FREE';
+  const limit = IMAGE_LIMITS[role] || 3;
+  res.json({ images: data || [], limit, used: (data || []).length });
+});
+
+// API: Upload image
+app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
+
+    // Check mime type
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowed.includes(req.file.mimetype)) return res.status(400).json({ error: 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.' });
+
+    // Check limits
+    const role = req.user.profile.role || 'FREE';
+    const limit = IMAGE_LIMITS[role] || 3;
+    const { count, error: countErr } = await supabase.from('user_images').select('*', { count: 'exact', head: true }).eq('profile_id', req.user.id);
+    if (countErr) return res.status(500).json({ error: countErr.message });
+    if (count >= limit) return res.status(403).json({ error: `Your ${role} tier is limited to ${limit} image(s). Please upgrade to upload more.` });
+
+    // Upload to Supabase Storage
+    const ext = req.file.originalname.split('.').pop() || 'jpg';
+    const storagePath = `${req.user.id}/${crypto.randomUUID()}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage.from('user-images').upload(storagePath, req.file.buffer, {
+      contentType: req.file.mimetype,
+      upsert: false
+    });
+    if (uploadErr) return res.status(500).json({ error: 'Upload failed: ' + uploadErr.message });
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from('user-images').getPublicUrl(storagePath);
+    const publicUrl = urlData?.publicUrl || '';
+
+    // Save metadata
+    const { data: img, error: insertErr } = await supabase.from('user_images').insert([{
+      profile_id: req.user.id,
+      file_name: req.file.originalname,
+      file_path: storagePath,
+      file_url: publicUrl,
+      file_size: req.file.size
+    }]).select().single();
+
+    if (insertErr) return res.status(500).json({ error: insertErr.message });
+    res.json(img);
+  } catch (e) {
+    console.error('Image upload error:', e.message);
+    res.status(500).json({ error: 'Upload failed.' });
+  }
+});
+
+// API: Delete image
+app.delete('/api/images/:id', requireAuth, async (req, res) => {
+  try {
+    const { data: img } = await supabase.from('user_images').select('*').eq('id', req.params.id).eq('profile_id', req.user.id).single();
+    if (!img) return res.status(404).json({ error: 'Image not found.' });
+
+    // Delete from storage
+    await supabase.storage.from('user-images').remove([img.file_path]);
+
+    // Delete linked trigger photos
+    await supabase.from('trigger_photos').delete().eq('image_id', req.params.id).eq('profile_id', req.user.id);
+
+    // Delete metadata
+    const { error } = await supabase.from('user_images').delete().eq('id', req.params.id).eq('profile_id', req.user.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ==================== TRIGGER PHOTOS ====================
+
+// API: List trigger photos (with image data)
+app.get('/api/trigger-photos', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('trigger_photos').select('*, user_images(*)').eq('profile_id', req.user.id).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+// API: Create or update trigger photo
+app.post('/api/trigger-photos', requireAuth, async (req, res) => {
+  try {
+    const { id, image_id, trigger_words, auto_send_enabled, auto_send_threshold, is_kb_skill } = req.body;
+    if (!image_id || !trigger_words) return res.status(400).json({ error: 'image_id and trigger_words are required.' });
+
+    // Verify image belongs to user
+    const { data: img } = await supabase.from('user_images').select('id').eq('id', image_id).eq('profile_id', req.user.id).single();
+    if (!img) return res.status(404).json({ error: 'Image not found.' });
+
+    if (id) {
+      // Update
+      const { error } = await supabase.from('trigger_photos').update({
+        image_id, trigger_words, auto_send_enabled: !!auto_send_enabled,
+        auto_send_threshold: auto_send_threshold || null, is_kb_skill: !!is_kb_skill
+      }).eq('id', id).eq('profile_id', req.user.id);
+      if (error) return res.status(500).json({ error: error.message });
+    } else {
+      // Insert
+      const { error } = await supabase.from('trigger_photos').insert([{
+        profile_id: req.user.id, image_id, trigger_words,
+        auto_send_enabled: !!auto_send_enabled,
+        auto_send_threshold: auto_send_threshold || null,
+        is_kb_skill: !!is_kb_skill
+      }]);
+      if (error) return res.status(500).json({ error: error.message });
+    }
+
+    // If is_kb_skill, sync to KB
+    if (is_kb_skill) {
+      const kbTitle = `Trigger Photo: ${trigger_words.split(',')[0].trim()}`;
+      const kbContent = `# Trigger Photo\n\nThis is a trigger photo that should be sent when the user says any of the following:\n${trigger_words.split(',').map(w => '- "' + w.trim() + '"').join('\n')}\n\n${auto_send_enabled ? `Auto-send is enabled after ${auto_send_threshold || 10} messages.` : ''}`;
+
+      const { data: existing } = await supabase.from('knowledge_entries').select('id').eq('profile_id', req.user.id).eq('title', kbTitle).single();
+      if (existing) {
+        await supabase.from('knowledge_entries').update({ content: kbContent }).eq('id', existing.id);
+      } else {
+        await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title: kbTitle, content: kbContent }]);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// API: Delete trigger photo
+app.delete('/api/trigger-photos/:id', requireAuth, async (req, res) => {
+  try {
+    // Clean up any KB entry
+    const { data: tp } = await supabase.from('trigger_photos').select('trigger_words').eq('id', req.params.id).eq('profile_id', req.user.id).single();
+    if (tp) {
+      const kbTitle = `Trigger Photo: ${tp.trigger_words.split(',')[0].trim()}`;
+      await supabase.from('knowledge_entries').delete().eq('profile_id', req.user.id).eq('title', kbTitle);
+    }
+
+    const { error } = await supabase.from('trigger_photos').delete().eq('id', req.params.id).eq('profile_id', req.user.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // API: Admin - Get All Users

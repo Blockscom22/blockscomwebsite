@@ -699,6 +699,7 @@
       <div class="nav-item active" id="nav-pages" onclick="showView('pages')">Dashboard</div>
       <div class="nav-item" id="nav-kb" onclick="showView('kb')">Knowledge Base</div>
       <div class="nav-item" id="nav-products" onclick="showView('products')">Inventory System</div>
+      <div class="nav-item" id="nav-images" onclick="showView('images')">Images</div>
       <div class="nav-item" id="nav-logs" onclick="showView('logs')">Live Activity</div>
       <div class="nav-item" onclick="window.location.href='/orders.html'">Orders</div>
     </div>
@@ -867,6 +868,41 @@
           <button class="btn btn-primary" onclick="saveInvRows()">💾 Save All Changes</button>
           <button class="btn btn-secondary" onclick="syncInvTable()">⟳ Force Sync to KB</button>
         </div>
+      </div>
+    </div>
+
+    <!-- View: Images -->
+    <div id="view-images" class="view-section" style="display:none">
+      <div class="header">
+        <div>
+          <h1>Images</h1>
+          <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Upload and manage your images. Create
+            trigger photos for your AI.</p>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center">
+          <div id="img-usage-badge"
+            style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-size:0.75rem; font-weight:700; color:var(--text-muted)">
+            0 / 3</div>
+          <button class="btn btn-primary" onclick="openUploadModal()">+ Upload Image</button>
+        </div>
+      </div>
+
+      <!-- Image Gallery -->
+      <div id="images-gallery"
+        style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:16px; margin-bottom:40px">
+      </div>
+
+      <!-- Trigger Photos Section -->
+      <div style="margin-top:16px">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px">
+          <div>
+            <h2>Trigger Photos</h2>
+            <p style="color:var(--text-dim); font-size:0.85rem; margin-top:4px">Set up images that auto-send when users
+              say specific words or phrases.</p>
+          </div>
+          <button class="btn btn-secondary" onclick="openTriggerPhotoModal()">+ Create Trigger Photo</button>
+        </div>
+        <div id="trigger-photos-list"></div>
       </div>
     </div>
 
@@ -1308,6 +1344,92 @@
           <button type="button" class="btn btn-secondary" onclick="closeModal('adminUserModal')">Cancel</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Upload Image -->
+  <div class="modal-overlay" id="uploadImageModal">
+    <div class="modal" style="max-width:500px">
+      <h2 style="margin-bottom:8px">Upload Image</h2>
+      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:24px">Upload an image to your storage. Max 5MB
+        per file. Supported: JPEG, PNG, GIF, WebP.</p>
+      <div id="upload-drop-zone"
+        style="border:2px dashed var(--border); border-radius:16px; padding:40px 24px; text-align:center; cursor:pointer; transition:0.2s; background:var(--bg)"
+        onclick="document.getElementById('upload-file-input').click()"
+        ondragover="event.preventDefault(); this.style.borderColor='var(--primary)'; this.style.background='var(--surface-elevated)'"
+        ondragleave="this.style.borderColor='var(--border)'; this.style.background='var(--bg)'"
+        ondrop="event.preventDefault(); this.style.borderColor='var(--border)'; this.style.background='var(--bg)'; handleUploadDrop(event)">
+        <div id="upload-preview" style="display:none; margin-bottom:16px">
+          <img id="upload-preview-img" style="max-width:100%; max-height:200px; border-radius:12px; object-fit:contain"
+            alt="preview">
+        </div>
+        <div id="upload-placeholder">
+          <div style="font-size:2rem; margin-bottom:8px">📸</div>
+          <div style="font-size:0.9rem; font-weight:600; color:var(--text)">Drop image here or click to browse</div>
+          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px">JPEG, PNG, GIF, WebP — Max 5MB</div>
+        </div>
+      </div>
+      <input type="file" id="upload-file-input" style="display:none" accept="image/jpeg,image/png,image/gif,image/webp"
+        onchange="handleUploadSelect(event)">
+      <div style="display:flex; gap:12px; margin-top:24px">
+        <button class="btn btn-primary" style="flex:1" id="upload-submit-btn" onclick="submitUpload()" disabled>Upload
+          Image</button>
+        <button class="btn btn-secondary" onclick="closeModal('uploadImageModal'); resetUploadModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Trigger Photo -->
+  <div class="modal-overlay" id="triggerPhotoModal">
+    <div class="modal" style="max-width:600px">
+      <h2 id="triggerPhotoModalTitle" style="margin-bottom:8px">Create Trigger Photo</h2>
+      <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:24px">Configure an image that the AI sends when
+        users say specific trigger words.</p>
+      <input type="hidden" id="tp-id-hidden">
+
+      <label>Select Image</label>
+      <div style="display:flex; gap:12px; align-items:flex-start; margin-bottom:20px">
+        <select id="tp-image-select" class="input" style="flex:1; margin:0" onchange="previewTriggerImage()">
+          <option value="">-- Choose an uploaded image --</option>
+        </select>
+        <div id="tp-image-preview"
+          style="width:80px; height:80px; border-radius:12px; border:1px solid var(--border); background:var(--bg); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0">
+          <span style="font-size:0.7rem; color:var(--text-dim)">Preview</span>
+        </div>
+      </div>
+
+      <label>Trigger Words or Phrases</label>
+      <p style="font-size:0.7rem; color:var(--text-dim); margin-top:-4px; margin-bottom:8px">Comma-separated phrases
+        that trigger this image (e.g. "send me photo, send me menu, show me the picture")</p>
+      <input id="tp-trigger-words" class="input" placeholder="e.g. send me photo, send me menu, show me the picture"
+        style="margin-top:0">
+
+      <div
+        style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:20px">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin-bottom:12px">
+          <input type="checkbox" id="tp-auto-send" style="accent-color:var(--primary)"
+            onchange="document.getElementById('tp-threshold-row').style.display = this.checked ? 'flex' : 'none'">
+          <span style="font-size:0.85rem; font-weight:600">Auto-send to client after message threshold</span>
+        </label>
+        <div id="tp-threshold-row" style="display:none; align-items:center; gap:10px">
+          <span style="font-size:0.8rem; color:var(--text-dim)">Send after</span>
+          <input type="number" id="tp-threshold" class="input" value="10" min="1" max="100"
+            style="width:80px; margin:0; text-align:center">
+          <span style="font-size:0.8rem; color:var(--text-dim)">messages</span>
+        </div>
+      </div>
+
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin-bottom:0">
+        <input type="checkbox" id="tp-kb-skill" style="accent-color:var(--primary)">
+        <span style="font-size:0.85rem; font-weight:600">Register as Knowledge Base Skill</span>
+      </label>
+      <p style="font-size:0.7rem; color:var(--text-dim); margin-top:4px; margin-bottom:20px">When enabled, the trigger
+        configuration will be added to your Knowledge Base so the AI knows about this trigger.</p>
+
+      <div style="display:flex; gap:12px; margin-top:24px">
+        <button class="btn btn-primary" style="flex:1" onclick="saveTriggerPhoto()">Save Trigger Photo</button>
+        <button class="btn btn-secondary" onclick="closeModal('triggerPhotoModal')">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -1825,6 +1947,7 @@
       if (view === 'logs') loadLogs();
       if (view === 'pages') loadPages();
       if (view === 'products') loadInvTables();
+      if (view === 'images') loadImages();
     }
 
     // ==================== FLEXIBLE INVENTORY SYSTEM JS ====================
@@ -3144,6 +3267,253 @@ Your replies must feel like:
         sidebar.classList.remove('open');
       }
     });
+
+    // ==================== IMAGES & TRIGGER PHOTOS JS ====================
+    let imagesCache = [];
+    let triggerPhotosCache = [];
+    let pendingUploadFile = null;
+
+    async function loadImages() {
+      const gallery = document.getElementById('images-gallery');
+      gallery.innerHTML = '<div class="empty-state"><h3>Loading Images...</h3><p style="opacity:0.6; margin-top:8px">Fetching your uploaded images...</p></div>';
+      try {
+        const [imgRes, tpRes] = await Promise.all([
+          fetch('/api/images', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }),
+          fetch('/api/trigger-photos', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } })
+        ]);
+        const imgData = await imgRes.json();
+        imagesCache = imgData.images || [];
+        const role = me?.role || 'FREE';
+        const limits = { FREE: 3, PREMIUM: 50, ENTERPRISE: '∞', ADMIN: '∞' };
+        document.getElementById('img-usage-badge').innerText = `${imgData.used || 0} / ${limits[role] || 3} images`;
+        triggerPhotosCache = await tpRes.json();
+      } catch (e) {
+        imagesCache = [];
+        triggerPhotosCache = [];
+        console.error('Failed to load images:', e);
+      }
+      renderImagesGallery();
+      renderTriggerPhotosList();
+    }
+
+    function renderImagesGallery() {
+      const gallery = document.getElementById('images-gallery');
+      if (imagesCache.length === 0) {
+        gallery.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><h3>No Images Yet</h3><p>Upload your first image to get started.</p></div>';
+        return;
+      }
+      gallery.innerHTML = imagesCache.map(img => `
+        <div class="card" style="padding:0; overflow:hidden; margin-bottom:0">
+          <div style="width:100%; height:140px; background:var(--bg); display:flex; align-items:center; justify-content:center; overflow:hidden">
+            <img src="${escapeHtml(img.file_url)}" alt="${escapeHtml(img.file_name)}" style="width:100%; height:100%; object-fit:cover" loading="lazy">
+          </div>
+          <div style="padding:12px">
+            <div style="font-size:0.8rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis" title="${escapeHtml(img.file_name)}">${escapeHtml(img.file_name)}</div>
+            <div style="font-size:0.7rem; color:var(--text-dim); margin-top:4px">${(img.file_size / 1024).toFixed(1)} KB · ${new Date(img.created_at).toLocaleDateString()}</div>
+            <div style="display:flex; gap:6px; margin-top:10px">
+              <button class="btn btn-secondary" style="flex:1; padding:6px; font-size:0.7rem" onclick="copyText('${escapeHtml(img.file_url)}', this)">Copy URL</button>
+              <button class="btn btn-danger" style="padding:6px 10px; font-size:0.7rem" onclick="deleteImage('${img.id}')">Del</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderTriggerPhotosList() {
+      const list = document.getElementById('trigger-photos-list');
+      if (triggerPhotosCache.length === 0) {
+        list.innerHTML = '<div class="card" style="text-align:center; padding:32px"><p style="color:var(--text-dim)">No trigger photos configured yet.</p></div>';
+        return;
+      }
+      list.innerHTML = triggerPhotosCache.map(tp => {
+        const img = tp.user_images;
+        return `
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex; gap:16px; align-items:flex-start">
+            <div style="width:72px; height:72px; border-radius:10px; overflow:hidden; flex-shrink:0; background:var(--bg); border:1px solid var(--border)">
+              ${img ? `<img src="${escapeHtml(img.file_url)}" style="width:100%; height:100%; object-fit:cover" alt="">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:0.7rem;color:var(--text-dim)">No img</div>'}
+            </div>
+            <div style="flex:1; min-width:0">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px">
+                <div>
+                  <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px">Trigger Photo</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px">
+                    ${tp.trigger_words.split(',').map(w => `<span class="badge badge-free" style="font-size:0.65rem">${escapeHtml(w.trim())}</span>`).join('')}
+                  </div>
+                </div>
+                <div style="display:flex; gap:6px; flex-shrink:0">
+                  <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem" onclick="openTriggerPhotoModal('${tp.id}')">Edit</button>
+                  <button class="btn btn-danger" style="padding:4px 10px; font-size:0.75rem" onclick="deleteTriggerPhoto('${tp.id}')">Del</button>
+                </div>
+              </div>
+              <div style="display:flex; gap:12px; font-size:0.75rem; color:var(--text-dim)">
+                ${tp.auto_send_enabled ? `<span style="color:var(--success)">⚡ Auto-send after ${tp.auto_send_threshold || 10} msgs</span>` : '<span>Manual trigger only</span>'}
+                ${tp.is_kb_skill ? '<span style="color:#c084fc">🧠 KB Skill</span>' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+        `;
+      }).join('');
+    }
+
+    // Upload modal helpers
+    function openUploadModal() {
+      resetUploadModal();
+      document.getElementById('uploadImageModal').style.display = 'flex';
+    }
+
+    function resetUploadModal() {
+      pendingUploadFile = null;
+      document.getElementById('upload-preview').style.display = 'none';
+      document.getElementById('upload-placeholder').style.display = 'block';
+      document.getElementById('upload-submit-btn').disabled = true;
+      document.getElementById('upload-file-input').value = '';
+    }
+
+    function handleUploadDrop(e) {
+      const file = e.dataTransfer.files[0];
+      if (file) setUploadFile(file);
+    }
+
+    function handleUploadSelect(e) {
+      const file = e.target.files[0];
+      if (file) setUploadFile(file);
+    }
+
+    function setUploadFile(file) {
+      const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowed.includes(file.type)) { alert('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'); return; }
+      if (file.size > 5 * 1024 * 1024) { alert('File too large. Maximum size is 5MB.'); return; }
+      pendingUploadFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        document.getElementById('upload-preview-img').src = e.target.result;
+        document.getElementById('upload-preview').style.display = 'block';
+        document.getElementById('upload-placeholder').style.display = 'none';
+        document.getElementById('upload-submit-btn').disabled = false;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function submitUpload() {
+      if (!pendingUploadFile) return;
+      const btn = document.getElementById('upload-submit-btn');
+      btn.disabled = true;
+      btn.innerText = 'Uploading...';
+
+      try {
+        const fd = new FormData();
+        fd.append('image', pendingUploadFile);
+        const res = await fetch('/api/images/upload', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
+          body: fd
+        });
+        const result = await res.json();
+        if (!res.ok) { alert(result.error || 'Upload failed.'); return; }
+        closeModal('uploadImageModal');
+        resetUploadModal();
+        await loadImages();
+      } catch (e) {
+        alert('Upload error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Upload Image';
+      }
+    }
+
+    async function deleteImage(id) {
+      if (!confirm('Delete this image? Any linked trigger photos will also be removed.')) return;
+      try {
+        const res = await fetch('/api/images/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to delete'); }
+      } catch (e) { alert('Error: ' + e.message); }
+      await loadImages();
+    }
+
+    // Trigger Photo modal helpers
+    function openTriggerPhotoModal(editId) {
+      document.getElementById('tp-id-hidden').value = '';
+      document.getElementById('tp-trigger-words').value = '';
+      document.getElementById('tp-auto-send').checked = false;
+      document.getElementById('tp-threshold-row').style.display = 'none';
+      document.getElementById('tp-threshold').value = '10';
+      document.getElementById('tp-kb-skill').checked = false;
+      document.getElementById('tp-image-preview').innerHTML = '<span style="font-size:0.7rem; color:var(--text-dim)">Preview</span>';
+      document.getElementById('triggerPhotoModalTitle').innerText = 'Create Trigger Photo';
+
+      // Populate image selector
+      const select = document.getElementById('tp-image-select');
+      select.innerHTML = '<option value="">-- Choose an uploaded image --</option>' +
+        imagesCache.map(img => `<option value="${img.id}" data-url="${escapeHtml(img.file_url)}">${escapeHtml(img.file_name)}</option>`).join('');
+
+      if (editId) {
+        const tp = triggerPhotosCache.find(t => t.id === editId);
+        if (tp) {
+          document.getElementById('tp-id-hidden').value = tp.id;
+          document.getElementById('tp-trigger-words').value = tp.trigger_words;
+          document.getElementById('tp-auto-send').checked = !!tp.auto_send_enabled;
+          document.getElementById('tp-threshold-row').style.display = tp.auto_send_enabled ? 'flex' : 'none';
+          document.getElementById('tp-threshold').value = tp.auto_send_threshold || '10';
+          document.getElementById('tp-kb-skill').checked = !!tp.is_kb_skill;
+          document.getElementById('triggerPhotoModalTitle').innerText = 'Edit Trigger Photo';
+          select.value = tp.image_id;
+          previewTriggerImage();
+        }
+      }
+
+      document.getElementById('triggerPhotoModal').style.display = 'flex';
+    }
+
+    function previewTriggerImage() {
+      const select = document.getElementById('tp-image-select');
+      const option = select.options[select.selectedIndex];
+      const url = option?.getAttribute('data-url');
+      const preview = document.getElementById('tp-image-preview');
+      if (url) {
+        preview.innerHTML = `<img src="${url}" style="width:100%; height:100%; object-fit:cover" alt="">`;
+      } else {
+        preview.innerHTML = '<span style="font-size:0.7rem; color:var(--text-dim)">Preview</span>';
+      }
+    }
+
+    async function saveTriggerPhoto() {
+      const imageId = document.getElementById('tp-image-select').value;
+      const triggerWords = document.getElementById('tp-trigger-words').value.trim();
+      if (!imageId) { alert('Please select an image.'); return; }
+      if (!triggerWords) { alert('Please enter at least one trigger word or phrase.'); return; }
+
+      const body = {
+        id: document.getElementById('tp-id-hidden').value || undefined,
+        image_id: imageId,
+        trigger_words: triggerWords,
+        auto_send_enabled: document.getElementById('tp-auto-send').checked,
+        auto_send_threshold: parseInt(document.getElementById('tp-threshold').value) || 10,
+        is_kb_skill: document.getElementById('tp-kb-skill').checked
+      };
+
+      try {
+        const res = await fetch('/api/trigger-photos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+          body: JSON.stringify(body)
+        });
+        const result = await res.json();
+        if (!res.ok) { alert(result.error || 'Failed to save.'); return; }
+        closeModal('triggerPhotoModal');
+        await loadImages();
+      } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    async function deleteTriggerPhoto(id) {
+      if (!confirm('Delete this trigger photo?')) return;
+      try {
+        const res = await fetch('/api/trigger-photos/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to delete'); }
+      } catch (e) { alert('Error: ' + e.message); }
+      await loadImages();
+    }
 
     init();
   </script>
