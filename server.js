@@ -1310,6 +1310,15 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
       if (!allowed) return res.status(403).json({ error: 'origin not allowed' });
     }
 
+    // Start fetching memory concurrently with KB/Inventory processing
+    const memoryPromise = supabase
+      .from('chat_memory')
+      .select('role, content')
+      .eq('fb_page_id', page.id)
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
     // Check KB+Inventory cache first (avoids repeated Supabase calls during burst conversations)
     const cacheKey = `widget:${page.profile_id}`;
     let personalityContent, context, productCatalog = "", widgetProducts = [];
@@ -1363,14 +1372,8 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
     const resolvedApiKey = process.env.OPENROUTER_API_KEY;
     if (!resolvedApiKey) return res.status(500).json({ error: 'missing OpenRouter key' });
 
-    // Fetch memory (last 10 messages)
-    const { data: memoryLogs } = await supabase
-      .from('chat_memory')
-      .select('role, content')
-      .eq('fb_page_id', page.id)
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    // Resolve memory (started concurrently earlier)
+    const { data: memoryLogs } = await memoryPromise;
 
     // Sort ascending for chronological order
     const priorMessages = (memoryLogs || []).reverse().map(log => ({
@@ -1625,6 +1628,15 @@ async function processMessage(event, fbPageId) {
     // 3. Build Context (Knowledge Base) + 3b. Fetch Inventory — in parallel
     debugLog(`[DEBUG] Building knowledge base + inventory for user ${page.profile_id}...`);
 
+    // Start fetching memory concurrently with KB/Inventory processing
+    const memoryPromise = supabase
+      .from('chat_memory')
+      .select('role, content')
+      .eq('fb_page_id', page.id)
+      .eq('session_id', senderId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
     // Check KB+Inventory cache first
     const cacheKey = `webhook:${page.profile_id}`;
     let personalityContent = '', context = '', productCatalog = "";
@@ -1713,14 +1725,8 @@ async function processMessage(event, fbPageId) {
     const fbUserCurrency = userProfile?.currency || 'PHP';
     const fbCurrencySymbol = CURRENCY_SYMBOLS[fbUserCurrency] || fbUserCurrency;
 
-    // Fetch memory (last 10 messages)
-    const { data: memoryLogs } = await supabase
-      .from('chat_memory')
-      .select('role, content')
-      .eq('fb_page_id', page.id)
-      .eq('session_id', senderId)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    // Resolve memory (started concurrently earlier)
+    const { data: memoryLogs } = await memoryPromise;
 
     // Sort ascending for chronological order
     const priorMessages = (memoryLogs || []).reverse().map(log => ({
