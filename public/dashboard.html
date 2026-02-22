@@ -605,7 +605,7 @@
           <h1>My Automations</h1>
           <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Manage your Facebook Page webhooks.</p>
         </div>
-        <button class="btn btn-primary" onclick="openPageModal()">+ Create Webhook</button>
+        <button class="btn btn-primary" onclick="openPageModal()">+ Add Automation</button>
       </div>
       <div id="pages-list" class="grid"></div>
     </div>
@@ -1822,7 +1822,7 @@
     }
 
     async function openPageModal(id = null) {
-      document.getElementById('pageModalTitle').innerText = id ? 'Update Configuration' : 'New Webhook Setup';
+      document.getElementById('pageModalTitle').innerText = id ? 'Update Configuration' : 'New Automation Setup';
 
       const targetId = id || ('temp-' + Date.now());
       updateWebhookUrl(targetId);
@@ -2127,7 +2127,15 @@
       if (confirm('Delete automation?')) {
         pagesCache = pagesCache.filter(p => p.id !== id);
         renderPagesList();
-        fetch('/api/pages/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }).then(() => loadPages());
+        try {
+          const res = await fetch('/api/pages/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+          if (!res.ok) throw new Error('Failed to delete');
+        } catch (e) {
+          alert('Error deleting: ' + e.message);
+        }
+        // Force a fresh fetch from the server
+        pagesLoaded = false;
+        await loadPages();
       }
     }
 
@@ -2135,7 +2143,14 @@
       if (confirm('Delete skill?')) {
         kbOptions = kbOptions.filter(k => k.id !== id);
         renderKbListBase();
-        fetch('/api/knowledge/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } }).then(() => loadKb());
+        try {
+          const res = await fetch('/api/knowledge/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentSession.access_token}` } });
+          if (!res.ok) throw new Error('Failed to delete');
+        } catch (e) {
+          alert('Error deleting: ' + e.message);
+        }
+        kbLoaded = false;
+        await loadKb();
       }
     }
     function closeModal(m) { document.getElementById(m).style.display = 'none'; }
