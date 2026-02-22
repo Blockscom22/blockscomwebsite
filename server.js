@@ -152,7 +152,7 @@ async function requireAuth(req, res, next) {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
   if (!profile) {
-    const { data: newProfile } = await supabase.from('profiles').insert([{ id: user.id, email: user.email }]).select().single();
+    const { data: newProfile } = await supabase.from('profiles').insert([{ id: user.id, email: user.email, credits: 50, role: 'FREE' }]).select().single();
     req.user = { ...user, profile: newProfile };
   } else {
     req.user = { ...user, profile };
@@ -220,9 +220,15 @@ app.post('/api/pages', requireAuth, async (req, res) => {
   try {
     const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base, widget_name } = req.body;
 
+    // Enforce model restrictions for FREE users
+    const FREE_MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-120b:free'];
+    const resolvedModel = (req.user.profile.role === 'FREE' && !FREE_MODELS.includes(ai_model))
+      ? 'openai/gpt-oss-120b'
+      : ai_model;
+
     if (id) {
       // Update
-      const updates = { name, fb_page_id, ai_model, knowledge_base, widget_name };
+      const updates = { name, fb_page_id, ai_model: resolvedModel, knowledge_base, widget_name };
       if (verify_token && !isMasked(verify_token)) updates.verify_token = encryptSecret(verify_token);
       if (access_token && !isMasked(access_token)) updates.access_token = encryptSecret(access_token);
 
@@ -236,7 +242,7 @@ app.post('/api/pages', requireAuth, async (req, res) => {
         fb_page_id,
         verify_token: encryptSecret(verify_token),
         access_token: encryptSecret(access_token),
-        ai_model,
+        ai_model: resolvedModel,
         knowledge_base: knowledge_base || [],
         widget_name,
         widget_key: crypto.randomBytes(12).toString('hex')
@@ -305,7 +311,7 @@ app.post('/api/knowledge', requireAuth, async (req, res) => {
   } else {
     // Check limits before inserting a new skill
     const roleLimits = {
-      'FREE': 1,
+      'FREE': 3,
       'PREMIUM': 10,
       'ENTERPRISE': 20,
       'ADMIN': 99999
@@ -386,6 +392,75 @@ app.post('/api/kb/scan-files', requireAuth, async (req, res) => {
       }
     }
     res.json({ success: true, count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Import KB from uploaded .md files (with prompt injection sanitization)
+app.post('/api/kb/import', requireAuth, async (req, res) => {
+  try {
+    const { entries } = req.body; // [{title, content}, ...]
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: 'No entries provided' });
+    }
+
+    // Check role limits
+    const roleLimits = { 'FREE': 3, 'PREMIUM': 10, 'ENTERPRISE': 20, 'ADMIN': 99999 };
+    const userRole = req.user.profile.role || 'FREE';
+    const limit = roleLimits[userRole] || 3;
+
+    const { count: existing } = await supabase
+      .from('knowledge_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('profile_id', req.user.id);
+
+    const available = limit - (existing || 0);
+    if (available <= 0) {
+      return res.status(403).json({ error: `Your ${userRole} tier has reached its limit of ${limit} knowledge entries.` });
+    }
+
+    // Sanitize and import (up to available slots)
+    const toImport = entries.slice(0, available);
+    let imported = 0;
+
+    for (const entry of toImport) {
+      let title = String(entry.title || '').trim().substring(0, 200);
+      let content = String(entry.content || '').trim();
+
+      if (!title || !content) continue;
+
+      // Prompt injection sanitization
+      // Remove lines that try to override system behavior
+      const dangerousPatterns = [
+        /^\s*(system|assistant|user)\s*:/gim,
+        /ignore\s+(all\s+)?previous\s+instructions/gi,
+        /ignore\s+(all\s+)?above\s+instructions/gi,
+        /you\s+are\s+now\s+(?:a|an|the)\s+(?:new|different)/gi,
+        /forget\s+(?:all|your|everything|previous)/gi,
+        /override\s+(?:system|your|all)/gi,
+        /disregard\s+(?:all|your|previous)/gi,
+        /new\s+instructions?\s*:/gi,
+        /\[\s*SYSTEM\s*\]/gi,
+        /\{\{.*?\}\}/g,
+        /<\|.*?\|>/g
+      ];
+
+      for (const pattern of dangerousPatterns) {
+        content = content.replace(pattern, '[REMOVED]');
+      }
+
+      // Check for duplicate title
+      const { data: dup } = await supabase.from('knowledge_entries')
+        .select('id').eq('profile_id', req.user.id).eq('title', title).single();
+
+      if (!dup) {
+        await supabase.from('knowledge_entries').insert([{ profile_id: req.user.id, title, content }]);
+        imported++;
+      }
+    }
+
+    res.json({ success: true, imported, skipped: toImport.length - imported });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

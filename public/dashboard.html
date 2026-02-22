@@ -572,6 +572,7 @@
       <div class="user-credits-container">
         <div class="credits-label">Balance</div>
         <div id="u-credits" class="credits-amount">0 Credits</div>
+        <div style="font-size:0.65rem; color:var(--text-dim); margin-top:2px; opacity:0.7">1 reply = 1 credit</div>
       </div>
       <button onclick="logout()" class="btn-logout">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -618,8 +619,12 @@
           <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Add skills and context for your AI models.
           </p>
         </div>
-        <div style="display:flex; gap:12px">
-          <button class="btn btn-secondary" onclick="scanFiles()">⟳ Import from Files</button>
+        <div style="display:flex; gap:12px; align-items:center">
+          <button class="btn btn-secondary" onclick="exportKbMd()">⭳ Export .md</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('kb-import-file').click()">⟳ Import
+            .md</button>
+          <input type="file" id="kb-import-file" style="display:none" accept=".md,.txt" multiple
+            onchange="importKbFiles(event)">
           <button class="btn btn-primary" onclick="openKbModal()">+ Add New Skill</button>
         </div>
       </div>
@@ -819,13 +824,15 @@
           <div>
             <label>AI Intelligence Model</label>
             <select id="p-model" class="input">
-              <option value="openai/gpt-oss-120b">FREE VERSION 1</option>
-              <option value="openai/gpt-oss-120b:free">FREE VERSION 1</option>
-              <option value="z-ai/glm-4.7-flash">Thinker</option>
-              <option value="openai/gpt-5-mini">Thinker</option>
-              <option value="openai/gpt-5.2-chat">Smart</option>
-              <option value="anthropic/claude-opus-4.6">Hyper Smart</option>
+              <option value="openai/gpt-oss-120b" data-tier="free">Free User 1</option>
+              <option value="openai/gpt-oss-120b:free" data-tier="free">Free User 2</option>
+              <option value="z-ai/glm-4.7-flash" data-tier="paid">Thinker</option>
+              <option value="openai/gpt-5-mini" data-tier="paid">Thinker Pro</option>
+              <option value="openai/gpt-5.2-chat" data-tier="paid">Smart</option>
+              <option value="anthropic/claude-opus-4.6" data-tier="paid">Hyper Smart</option>
             </select>
+            <div id="model-restriction-note" style="display:none; font-size:0.7rem; color:#f59e0b; margin-top:4px">⚠
+              FREE tier can only use Free User models. Upgrade to unlock premium models.</div>
           </div>
         </div>
 
@@ -1002,6 +1009,13 @@
     function escapeHtml(unsafe) {
       if (typeof unsafe !== 'string') return unsafe;
       return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+        setTimeout(() => btn.innerHTML = orig, 1500);
+      });
     }
     let currentSession = null;
     let me = null;
@@ -1214,12 +1228,24 @@
             </div>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
-            <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+              <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase">Webhook Endpoint</div>
+              <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; display:inline-flex; align-items:center; gap:4px;" onclick="copyText('${window.location.origin}/webhook?page=${p.id}', this)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy
+              </button>
+            </div>
             <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">${window.location.origin}/webhook?page=${p.id}</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
-              <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Website Plugin Snippet</div>
+              <div style="display:flex; align-items:center; gap:8px">
+                <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Website Plugin Snippet</div>
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.7rem; display:inline-flex; align-items:center; gap:4px;" onclick="copyText(document.getElementById('snippet-code-${p.id}').innerText, this)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  Copy
+                </button>
+              </div>
               <select class="input" style="width:auto; margin:0; padding:4px 8px; font-size:0.75rem" onchange="updateSnippetTheme('${p.id}', '${p.widget_key || ''}', this.value)">
                 <option value="default" ${p.widget_theme === 'default' || !p.widget_theme ? 'selected' : ''}>Default Theme</option>
                 <option value="white" ${p.widget_theme === 'white' ? 'selected' : ''}>White Theme</option>
@@ -1284,10 +1310,69 @@
       const j = await res.json();
       if (j.success) {
         alert(`Imported ${j.count} new skills from markdown files.`);
+        kbLoaded = false;
         await loadKb();
       } else {
         alert("Import failed: " + j.error);
       }
+    }
+
+    async function exportKbMd() {
+      if (!kbOptions || kbOptions.length === 0) {
+        alert('No knowledge entries to export.');
+        return;
+      }
+      // Create a zip-like download of all KB as individual .md strings bundled in one text
+      // For simplicity, export as a single combined .md file
+      let md = '';
+      kbOptions.forEach(k => {
+        md += `---\n# ${k.title}\n---\n\n${k.content}\n\n\n`;
+      });
+
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'blockscom_knowledge_base.md';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    async function importKbFiles(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+
+      const entries = [];
+      for (const file of files) {
+        const text = await file.text();
+        const title = file.name.replace(/\.(md|txt)$/i, '').split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        entries.push({ title, content: text });
+      }
+
+      try {
+        const res = await fetch('/api/kb/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentSession.access_token}`
+          },
+          body: JSON.stringify({ entries })
+        });
+
+        const result = await res.json();
+        if (!res.ok) {
+          alert('Import failed: ' + (result.error || 'Unknown error'));
+        } else {
+          alert(`Imported ${result.imported} skill(s). ${result.skipped > 0 ? result.skipped + ' skipped (duplicates).' : ''}`);
+          kbLoaded = false;
+          await loadKb();
+        }
+      } catch (e) {
+        alert('Import error: ' + e.message);
+      }
+
+      event.target.value = '';
     }
 
     async function loadLogs() {
@@ -1876,6 +1961,23 @@
 
       renderKbSelectionList(kbOptions, selected);
       await renderProductSelectionList(selected);
+
+      // Restrict model dropdown for FREE users
+      const modelSelect = document.getElementById('p-model');
+      const restrictionNote = document.getElementById('model-restriction-note');
+      const isFree = me && me.role === 'FREE';
+      Array.from(modelSelect.options).forEach(opt => {
+        if (opt.dataset.tier === 'paid') {
+          opt.disabled = isFree;
+          opt.style.color = isFree ? '#555' : '';
+        }
+      });
+      restrictionNote.style.display = isFree ? 'block' : 'none';
+      // If FREE user currently has a paid model selected, force to first free model
+      if (isFree && modelSelect.selectedOptions[0]?.dataset.tier === 'paid') {
+        modelSelect.value = 'openai/gpt-oss-120b';
+      }
+
       document.getElementById('pageModal').style.display = 'flex';
     }
 
@@ -2016,7 +2118,7 @@
       if (isNew) {
         // Enforce limits on the frontend before saving
         const roleLimits = {
-          'FREE': 1,
+          'FREE': 3,
           'PREMIUM': 10,
           'ENTERPRISE': 20,
           'ADMIN': 99999
