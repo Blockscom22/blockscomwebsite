@@ -718,7 +718,13 @@ Please format nicely with headers and bullet points.`
 
     // Deduct 2 credits atomically (floor at 0)
     if (req.user.profile.role !== 'ADMIN') {
-      await supabase.rpc('deduct_credits', { user_id: req.user.id, amount: 2 }).single();
+      try {
+        await supabase.rpc('deduct_credits', { user_id: req.user.id, amount: 2 }).single();
+      } catch (_rpcErr) {
+        // Fallback if RPC function not yet created in Supabase
+        const newCredits = Math.max(0, (req.user.profile.credits || 0) - 2);
+        await supabase.from('profiles').update({ credits: newCredits }).eq('id', req.user.id);
+      }
     }
 
     res.json({ success: true, report });
@@ -895,7 +901,13 @@ INSTRUCTIONS:
 
     // Deduct 1 credit atomically for widget replies
     if (userProfile && userProfile.role !== 'ADMIN') {
-      await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
+      try {
+        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
+      } catch (_rpcErr) {
+        // Fallback if RPC function not yet created in Supabase
+        const newCredits = Math.max(0, (userProfile.credits || 0) - 1);
+        await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
+      }
     }
 
     res.json({ ok: true, reply, products: products || [] });
@@ -1175,7 +1187,13 @@ async function processMessage(event, fbPageId) {
     }]);
 
     if (userProfile && userProfile.role !== 'ADMIN') {
-      await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
+      try {
+        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
+      } catch (_rpcErr) {
+        // Fallback if RPC function not yet created in Supabase
+        const newCredits = Math.max(0, (userProfile.credits || 0) - 1);
+        await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
+      }
     }
 
   } catch (err) {
