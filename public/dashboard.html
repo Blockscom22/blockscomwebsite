@@ -1107,39 +1107,61 @@
       <h2 style="margin-bottom:8px">Choose a Skill Template</h2>
       <p style="color:var(--text-dim); font-size:0.85rem; margin-bottom:12px">Select a template to get started quickly,
         or create a blank skill from scratch.</p>
-      <div class="template-grid">
-        <div class="template-card" onclick="selectTemplate('blank')">
-          <div class="template-icon">📝</div>
-          <div class="template-label">Blank Skill</div>
-          <div class="template-desc">Start from scratch</div>
+      <div
+        style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-top:20px; margin-bottom:10px">
+        &#11088; Popular Templates</div>
+      <div class="template-grid" id="popular-templates">
+        <div class="template-card" onclick="selectTemplate('business_general')"
+          style="border-color:rgba(59,130,246,0.3); background:linear-gradient(145deg, var(--bg), rgba(59,130,246,0.05))">
+          <div class="template-icon">&#127970;</div>
+          <div class="template-label">Business</div>
+          <div class="template-desc">General business KB</div>
         </div>
-        <div class="template-card" onclick="selectTemplate('customer_support')">
-          <div class="template-icon">🎧</div>
+        <div class="template-card" onclick="selectTemplate('customer_support')"
+          style="border-color:rgba(168,85,247,0.3); background:linear-gradient(145deg, var(--bg), rgba(168,85,247,0.05))">
+          <div class="template-icon">&#127911;</div>
           <div class="template-label">Customer Support</div>
           <div class="template-desc">Handle inquiries</div>
         </div>
+        <div class="template-card" onclick="selectTemplate('venue')"
+          style="border-color:rgba(236,72,153,0.3); background:linear-gradient(145deg, var(--bg), rgba(236,72,153,0.05))">
+          <div class="template-icon">&#127963;&#65039;</div>
+          <div class="template-label">Venue</div>
+          <div class="template-desc">Location &amp; events</div>
+        </div>
+        <div class="template-card" onclick="selectTemplate('appointment_booking')"
+          style="border-color:rgba(34,197,94,0.3); background:linear-gradient(145deg, var(--bg), rgba(34,197,94,0.05))">
+          <div class="template-icon">&#128197;</div>
+          <div class="template-label">Appointment</div>
+          <div class="template-desc">Schedule bookings</div>
+        </div>
+      </div>
+      <div
+        style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-top:24px; margin-bottom:10px">
+        More Templates</div>
+      <div class="template-grid">
+        <div class="template-card" onclick="selectTemplate('blank')">
+          <div class="template-icon">&#128221;</div>
+          <div class="template-label">Blank Skill</div>
+          <div class="template-desc">Start from scratch</div>
+        </div>
         <div class="template-card" onclick="selectTemplate('order_taking')">
-          <div class="template-icon">🛒</div>
+          <div class="template-icon">&#128722;</div>
           <div class="template-label">Order Taking</div>
           <div class="template-desc">Process orders</div>
         </div>
         <div class="template-card" onclick="selectTemplate('returns_refunds')">
-          <div class="template-icon">🔄</div>
-          <div class="template-label">Returns & Refunds</div>
+          <div class="template-icon">&#128260;</div>
+          <div class="template-label">Returns &amp; Refunds</div>
           <div class="template-desc">Handle returns</div>
         </div>
         <div class="template-card" onclick="selectTemplate('upsell_crosssell')">
-          <div class="template-icon">💰</div>
-          <div class="template-label">Upsell & Cross-sell</div>
+          <div class="template-icon">&#128176;</div>
+          <div class="template-label">Upsell &amp; Cross-sell</div>
           <div class="template-desc">Boost revenue</div>
         </div>
-        <div class="template-card" onclick="selectTemplate('appointment_booking')">
-          <div class="template-icon">📅</div>
-          <div class="template-label">Appointment Booking</div>
-          <div class="template-desc">Schedule meetings</div>
-        </div>
         <div class="template-card" onclick="selectTemplate('faq')">
-          <div class="template-icon">❓</div>
+          <div class="template-icon">&#10067;</div>
           <div class="template-label">FAQ Base</div>
           <div class="template-desc">Common questions</div>
         </div>
@@ -1149,6 +1171,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- Modal: Template Form -->
   <div class="modal-overlay" id="templateFormModal">
@@ -2283,10 +2306,35 @@
     // ==================== TEMPLATE SYSTEM ====================
 
     const SKILL_TEMPLATES = {
+      business_general: {
+        title: 'Business Knowledge Base',
+        icon: '🏢',
+        desc: 'Set up a general knowledge base about your business — info, policies, contact details, and more.',
+        hasLang: true,
+        fields: [
+          { key: 'business', label: 'Business / Brand Name', placeholder: 'e.g. Acme Corp', type: 'text' },
+          { key: 'industry', label: 'Industry / Business Type', placeholder: 'e.g. E-commerce, Restaurant, Salon', type: 'text' },
+          { key: 'address', label: 'Address / Location', placeholder: 'e.g. 123 Main St, Makati City', type: 'text' },
+          { key: 'contact', label: 'Contact Information', placeholder: 'e.g. Phone: 0917-xxx, Email: info@business.com', type: 'text' },
+          { key: 'hours', label: 'Operating Hours', placeholder: 'e.g. Mon-Sat 9AM-8PM, Sun Closed', type: 'text' },
+          { key: 'about', label: 'About the Business', placeholder: 'Brief description of what your business does, your mission, specialties, etc.', type: 'textarea' },
+          { key: 'policies', label: 'Business Policies / Rules', placeholder: 'e.g. No refund after 7 days\nReservation required for groups of 10+\nPayment via GCash or Cash only', type: 'textarea' }
+        ],
+        generate: (d) => {
+          const tl = d.lang === 'tagalog';
+          const name = d.business || 'My Business';
+          const policies = (d.policies || '').split('\n').filter(Boolean).map(p => `- ${p.trim()}`).join('\n');
+          if (tl) {
+            return `# ${name} — Impormasyon ng Negosyo\n\n## Uri ng Negosyo\n${d.industry || 'Hindi tinukoy'}\n\n## Lokasyon / Address\n${d.address || 'Hindi tinukoy'}\n\n## Impormasyon sa Pakikipag-ugnayan\n${d.contact || 'Hindi tinukoy'}\n\n## Oras ng Operasyon\n${d.hours || 'Hindi tinukoy'}\n\n## Tungkol sa Negosyo\n${d.about || 'Walang paglalarawan.'}\n\n## Mga Patakaran ng Negosyo\n${policies || '- Walang tinukoy na patakaran.'}\n\n## Mga Tagubilin para sa AI\n- Laging sumagot sa Tagalog maliban kung English ang ginamit ng customer.\n- Magbigay ng tumpak na impormasyon batay sa kaalaman sa itaas.\n- Kung hindi mo alam ang sagot, sabihin na ipapasa sa human agent.\n- Maging magalang at propesyonal sa lahat ng oras.`;
+          }
+          return `# ${name} — Business Information\n\n## Business Type\n${d.industry || 'Not specified'}\n\n## Location / Address\n${d.address || 'Not specified'}\n\n## Contact Information\n${d.contact || 'Not specified'}\n\n## Operating Hours\n${d.hours || 'Not specified'}\n\n## About the Business\n${d.about || 'No description provided.'}\n\n## Business Policies\n${policies || '- No policies specified.'}\n\n## AI Instructions\n- Always provide accurate information based on the knowledge above.\n- If you do not know the answer, let the customer know a human agent will follow up.\n- Be friendly and professional at all times.\n- Keep responses concise and helpful.`;
+        }
+      },
       customer_support: {
         title: 'Customer Support',
         icon: '🎧',
         desc: 'Set up how the AI handles customer inquiries and support tickets.',
+        hasLang: true,
         fields: [
           { key: 'business', label: 'Business / Brand Name', placeholder: 'e.g. Acme Corp', type: 'text' },
           { key: 'hours', label: 'Support Hours', placeholder: 'e.g. Mon-Fri 9AM-6PM PST', type: 'text' },
@@ -2294,7 +2342,63 @@
           { key: 'issues', label: 'Common Issues (one per line)', placeholder: 'Shipping delays\nWrong item received\nPayment issues', type: 'textarea' },
           { key: 'tone', label: 'Tone & Style', placeholder: 'e.g. Friendly and professional, empathetic', type: 'text' }
         ],
-        generate: (d) => `# ${d.business} — Customer Support Skill\n\n## Support Hours\n${d.hours || 'Not specified'}\n\n## Support Channels\n${d.channels || 'Messenger'}\n\n## Tone & Style\n${d.tone || 'Friendly and professional'}\n\n## Common Issues & How to Handle\n${(d.issues || '').split('\n').filter(Boolean).map(i => `- **${i.trim()}**: Acknowledge the issue, apologize, and provide a solution or escalate.`).join('\n')}\n\n## General Instructions\n- Always greet the customer warmly.\n- If you cannot resolve the issue, let them know a human agent will follow up.\n- Never share internal policies or confidential information.\n- Keep responses concise and helpful.`
+        generate: (d) => {
+          const tl = d.lang === 'tagalog';
+          const name = d.business || 'My Business';
+          const issuesList = (d.issues || '').split('\n').filter(Boolean);
+          if (tl) {
+            return `# ${name} — Customer Support Skill\n\n## Oras ng Support\n${d.hours || 'Hindi tinukoy'}\n\n## Mga Channel ng Support\n${d.channels || 'Messenger'}\n\n## Tono at Estilo\n${d.tone || 'Magiliw at propesyonal'}\n\n## Mga Karaniwang Isyu at Paano Haharapin\n${issuesList.map(i => `- **${i.trim()}**: Kilalanin ang isyu, humingi ng paumanhin, at magbigay ng solusyon o i-escalate.`).join('\n')}\n\n## Pangkalahatang Tagubilin\n- Laging batiin nang magiliw ang customer.\n- Kung hindi mo malutas ang isyu, ipaalam na may susunod na human agent.\n- Huwag magbahagi ng mga internal na patakaran o kumpidensyal na impormasyon.\n- Panatilihing maikli at nakakatulong ang mga sagot.\n- Sumagot sa Tagalog maliban kung English ang ginamit ng customer.`;
+          }
+          return `# ${name} — Customer Support Skill\n\n## Support Hours\n${d.hours || 'Not specified'}\n\n## Support Channels\n${d.channels || 'Messenger'}\n\n## Tone & Style\n${d.tone || 'Friendly and professional'}\n\n## Common Issues & How to Handle\n${issuesList.map(i => `- **${i.trim()}**: Acknowledge the issue, apologize, and provide a solution or escalate.`).join('\n')}\n\n## General Instructions\n- Always greet the customer warmly.\n- If you cannot resolve the issue, let them know a human agent will follow up.\n- Never share internal policies or confidential information.\n- Keep responses concise and helpful.`;
+        }
+      },
+      venue: {
+        title: 'Venue Knowledge Base',
+        icon: '🏛️',
+        desc: 'Set up knowledge about your venue — location, capacity, amenities, pricing, and event information.',
+        hasLang: true,
+        fields: [
+          { key: 'venue_name', label: 'Venue Name', placeholder: 'e.g. Grand Ballroom, The Garden Events Place', type: 'text' },
+          { key: 'venue_type', label: 'Venue Type', placeholder: 'e.g. Event Hall, Restaurant, Co-working Space, Resort', type: 'text' },
+          { key: 'address', label: 'Address / Location', placeholder: 'e.g. 456 Event Rd, Quezon City, Metro Manila', type: 'text' },
+          { key: 'capacity', label: 'Capacity / Size', placeholder: 'e.g. Up to 200 seated, 300 cocktail-style', type: 'text' },
+          { key: 'amenities', label: 'Amenities / Features (one per line)', placeholder: 'Free parking\nAir-conditioned\nSound system included\nWiFi available\nCatering available', type: 'textarea' },
+          { key: 'pricing', label: 'Pricing / Rates (one per line)', placeholder: 'Weekday: ₱15,000 for 4 hours\nWeekend: ₱25,000 for 4 hours\nOvertime: ₱3,000/hour', type: 'textarea' },
+          { key: 'hours', label: 'Operating Hours', placeholder: 'e.g. Mon-Sun 8AM-10PM', type: 'text' },
+          { key: 'booking', label: 'Booking / Contact Info', placeholder: 'e.g. Call 0917-xxx-xxxx or message us on Facebook to reserve', type: 'textarea' }
+        ],
+        generate: (d) => {
+          const tl = d.lang === 'tagalog';
+          const name = d.venue_name || 'My Venue';
+          const amenities = (d.amenities || '').split('\n').filter(Boolean).map(a => `- ${a.trim()}`).join('\n');
+          const pricing = (d.pricing || '').split('\n').filter(Boolean).map(p => `- ${p.trim()}`).join('\n');
+          if (tl) {
+            return `# ${name} — Impormasyon ng Venue\n\n## Uri ng Venue\n${d.venue_type || 'Hindi tinukoy'}\n\n## Lokasyon / Address\n${d.address || 'Hindi tinukoy'}\n\n## Kapasidad\n${d.capacity || 'Hindi tinukoy'}\n\n## Mga Amenities at Features\n${amenities || '- Walang tinukoy.'}\n\n## Presyo at Rates\n${pricing || '- Walang tinukoy na presyo.'}\n\n## Oras ng Operasyon\n${d.hours || 'Hindi tinukoy'}\n\n## Paano Mag-book / Contact\n${d.booking || 'Makipag-ugnayan sa amin para sa reservation.'}\n\n## Mga Tagubilin para sa AI\n- Magbigay ng tumpak na impormasyon tungkol sa venue.\n- Kung may nagtatanong ng availability, sabihin na mag-message o tumawag para i-confirm.\n- Sumagot sa Tagalog maliban kung English ang ginamit ng customer.\n- Maging magiliw at nakakatulong sa lahat ng oras.`;
+          }
+          return `# ${name} — Venue Information\n\n## Venue Type\n${d.venue_type || 'Not specified'}\n\n## Location / Address\n${d.address || 'Not specified'}\n\n## Capacity\n${d.capacity || 'Not specified'}\n\n## Amenities & Features\n${amenities || '- Not specified.'}\n\n## Pricing & Rates\n${pricing || '- No pricing specified.'}\n\n## Operating Hours\n${d.hours || 'Not specified'}\n\n## How to Book / Contact\n${d.booking || 'Contact us to make a reservation.'}\n\n## AI Instructions\n- Provide accurate venue information based on the knowledge above.\n- If someone asks about availability, ask them to message or call to confirm.\n- Be friendly and helpful at all times.\n- Keep responses clear and informative.`;
+        }
+      },
+      appointment_booking: {
+        title: 'Appointment Booking',
+        icon: '📅',
+        desc: 'Let the AI help customers schedule appointments and bookings.',
+        hasLang: true,
+        fields: [
+          { key: 'business', label: 'Business / Brand Name', placeholder: 'e.g. GlowUp Salon', type: 'text' },
+          { key: 'days', label: 'Available Days', placeholder: 'e.g. Monday to Saturday', type: 'text' },
+          { key: 'hours', label: 'Available Hours', placeholder: 'e.g. 9:00 AM - 7:00 PM', type: 'text' },
+          { key: 'services', label: 'Services Offered (one per line)', placeholder: 'Haircut - 30 min - ₱250\nHair Color - 2 hrs - ₱800\nManicure - 45 min - ₱200', type: 'textarea' },
+          { key: 'instructions', label: 'Booking Instructions', placeholder: 'e.g. Ask for preferred date, time, and service. Confirm availability.', type: 'textarea' }
+        ],
+        generate: (d) => {
+          const tl = d.lang === 'tagalog';
+          const name = d.business || 'My Business';
+          const services = (d.services || '').split('\n').filter(Boolean).map(s => `- ${s.trim()}`).join('\n');
+          if (tl) {
+            return `# ${name} — Appointment Booking Skill\n\n## Available na Schedule\n- **Araw**: ${d.days || 'Lunes hanggang Biyernes'}\n- **Oras**: ${d.hours || '9 AM - 5 PM'}\n\n## Mga Serbisyo\n${services || '- Walang tinukoy na serbisyo.'}\n\n## Proseso ng Pag-book\n${d.instructions || '1. Itanong ang preferred na petsa at oras\n2. Itanong kung anong serbisyo ang gusto\n3. I-confirm ang detalye ng booking\n4. Magbigay ng confirmation message'}\n\n## Mga Tagubilin\n- Laging i-confirm ang petsa, oras, at serbisyo bago i-finalize.\n- Kung hindi available ang slot, mag-suggest ng pinakamalapit na available na oras.\n- Kuhanin ang pangalan at contact number ng customer.\n- Maging magiliw at propesyonal.\n- Sumagot sa Tagalog maliban kung English ang ginamit ng customer.`;
+          }
+          return `# ${name} — Appointment Booking Skill\n\n## Available Schedule\n- **Days**: ${d.days || 'Monday to Friday'}\n- **Hours**: ${d.hours || '9 AM - 5 PM'}\n\n## Services\n${services || '- No services specified.'}\n\n## Booking Process\n${d.instructions || '1. Ask for preferred date and time\n2. Ask which service they want\n3. Confirm the booking details\n4. Provide a confirmation message'}\n\n## Instructions\n- Always confirm the date, time, and service before finalizing.\n- If a slot is unavailable, suggest the nearest available time.\n- Collect customer name and contact number.\n- Be warm and professional.`;
+        }
       },
       order_taking: {
         title: 'Order Taking',
@@ -2306,7 +2410,7 @@
           { key: 'delivery', label: 'Delivery Options', placeholder: 'e.g. Standard (3-5 days), Express (1 day), Pickup', type: 'text' },
           { key: 'steps', label: 'Order Process Steps (one per line)', placeholder: 'Ask what they want to order\nConfirm items and quantities\nAsk for shipping address\nConfirm total and payment method', type: 'textarea' }
         ],
-        generate: (d) => `# ${d.business} — Order Taking Skill\n\n## Payment Methods\n${(d.payment || '').split(',').map(p => `- ${p.trim()}`).join('\n')}\n\n## Delivery Options\n${(d.delivery || '').split(',').map(p => `- ${p.trim()}`).join('\n')}\n\n## Order Process\n${(d.steps || '').split('\n').filter(Boolean).map((s, i) => `${i + 1}. ${s.trim()}`).join('\n')}\n\n## Instructions\n- Always confirm the full order before finalizing.\n- Ask for customer name, contact info, and shipping address.\n- Use the place_order tool once all details are collected.\n- Be polite and efficient.`
+        generate: (d) => `# ${d.business || 'My Business'} — Order Taking Skill\n\n## Payment Methods\n${(d.payment || '').split(',').map(p => `- ${p.trim()}`).join('\n')}\n\n## Delivery Options\n${(d.delivery || '').split(',').map(p => `- ${p.trim()}`).join('\n')}\n\n## Order Process\n${(d.steps || '').split('\n').filter(Boolean).map((s, i) => `${i + 1}. ${s.trim()}`).join('\n')}\n\n## Instructions\n- Always confirm the full order before finalizing.\n- Ask for customer name, contact info, and shipping address.\n- Use the place_order tool once all details are collected.\n- Be polite and efficient.`
       },
       returns_refunds: {
         title: 'Returns & Refunds',
@@ -2330,19 +2434,6 @@
           { key: 'triggers', label: 'Trigger Phrases (one per line)', placeholder: 'anything else?\ndo you have accessories?\nwhat goes well with this?', type: 'textarea' }
         ],
         generate: (d) => `# Upsell & Cross-sell Skill\n\n## Product Recommendations\n${(d.pairs || '').split('\n').filter(Boolean).map(p => `- ${p.trim()}`).join('\n')}\n\n## Bundle Discounts & Offers\n${(d.discounts || '').split('\n').filter(Boolean).map(p => `- ${p.trim()}`).join('\n')}\n\n## Trigger Phrases\nWhen the customer says any of these, suggest related products:\n${(d.triggers || '').split('\n').filter(Boolean).map(p => `- "${p.trim()}"`).join('\n')}\n\n## Instructions\n- Only suggest products from the catalog.\n- Keep suggestions natural — don't be pushy.\n- Mention discounts or bundles when applicable.\n- Maximum 2 suggestions per interaction.`
-      },
-      appointment_booking: {
-        title: 'Appointment Booking',
-        icon: '📅',
-        desc: 'Let the AI help customers schedule appointments.',
-        fields: [
-          { key: 'business', label: 'Business / Brand Name', placeholder: 'e.g. GlowUp Salon', type: 'text' },
-          { key: 'days', label: 'Available Days', placeholder: 'e.g. Monday to Saturday', type: 'text' },
-          { key: 'hours', label: 'Available Hours', placeholder: 'e.g. 9:00 AM - 7:00 PM', type: 'text' },
-          { key: 'services', label: 'Services Offered (one per line)', placeholder: 'Haircut - 30 min - $25\nHair Color - 2 hrs - $80\nManicure - 45 min - $20', type: 'textarea' },
-          { key: 'instructions', label: 'Booking Instructions', placeholder: 'e.g. Ask for preferred date, time, and service. Confirm availability.', type: 'textarea' }
-        ],
-        generate: (d) => `# ${d.business} — Appointment Booking Skill\n\n## Available Schedule\n- **Days**: ${d.days || 'Monday to Friday'}\n- **Hours**: ${d.hours || '9 AM - 5 PM'}\n\n## Services\n${(d.services || '').split('\n').filter(Boolean).map(s => `- ${s.trim()}`).join('\n')}\n\n## Booking Process\n${d.instructions || '1. Ask for preferred date and time\n2. Ask which service they want\n3. Confirm the booking details\n4. Provide a confirmation message'}\n\n## Instructions\n- Always confirm the date, time, and service before finalizing.\n- If a slot is unavailable, suggest the nearest available time.\n- Collect customer name and contact number.\n- Be warm and professional.`
       },
       faq: {
         title: 'FAQ Base',
@@ -2387,8 +2478,26 @@
 
       const container = document.getElementById('templateFormFields');
 
+      // Language selector for templates that support it
+      let langHtml = '';
+      if (tpl.hasLang) {
+        langHtml = `
+          <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:24px; display:flex; align-items:center; gap:16px">
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0">
+              <span style="font-size:1.2rem">🌐</span>
+              <label style="margin:0; font-weight:700; font-size:0.85rem; white-space:nowrap">Language / Wika</label>
+            </div>
+            <select id="template-lang-select" class="input" style="margin:0; flex:1">
+              <option value="english">🇺🇸 English</option>
+              <option value="tagalog">🇵🇭 Tagalog</option>
+            </select>
+          </div>
+        `;
+      }
+
       if (tpl.isFaq) {
         container.innerHTML = `
+          ${langHtml}
           <div id="faq-pairs-container"></div>
           <button type="button" class="btn btn-secondary" style="margin-top:12px" onclick="addFaqPair()">+ Add Question</button>
         `;
@@ -2396,7 +2505,7 @@
         addFaqPair();
         addFaqPair();
       } else {
-        container.innerHTML = tpl.fields.map(f => {
+        container.innerHTML = langHtml + tpl.fields.map(f => {
           if (f.type === 'textarea') {
             return `<label>${escapeHtml(f.label)}</label><textarea class="input" data-key="${f.key}" placeholder="${escapeHtml(f.placeholder)}" style="min-height:100px"></textarea>`;
           }
@@ -2445,6 +2554,12 @@
         document.querySelectorAll('#templateFormFields [data-key]').forEach(el => {
           data[el.dataset.key] = el.value;
         });
+      }
+
+      // Read the language selection if present
+      const langSelect = document.getElementById('template-lang-select');
+      if (langSelect) {
+        data.lang = langSelect.value;
       }
 
       const title = tpl.title;
