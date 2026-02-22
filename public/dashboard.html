@@ -264,8 +264,8 @@
       border: 1px solid var(--border);
       border-radius: 20px;
       padding: 28px;
-      margin-bottom: 24px;
       transition: 0.2s;
+      overflow: hidden;
     }
 
     .card:hover {
@@ -432,7 +432,6 @@
       .card {
         padding: 16px;
         border-radius: 14px;
-        margin-bottom: 16px;
       }
 
       .grid {
@@ -3463,6 +3462,7 @@ Your replies must feel like:
             headers: { 'Authorization': `Bearer ${currentSession.access_token}` },
             body: fd
           });
+          if (res.status === 413) { alert('Total file size is too large. Try uploading fewer images at once (max ~5MB per file).'); return; }
           const result = await res.json();
           if (!res.ok) { alert(result.error || 'Upload failed.'); return; }
           if (result.errors && result.errors.length > 0) {

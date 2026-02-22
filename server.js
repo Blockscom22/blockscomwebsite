@@ -7,8 +7,8 @@ const compression = require('compression');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-// Multer — memory storage for image uploads (max 5MB)
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// Multer — memory storage for image uploads (max 5MB per file, 60MB total for multi-upload)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 10, fieldSize: 10 * 1024 * 1024 } });
 
 // Environment
 const IS_PROD = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
@@ -39,7 +39,8 @@ app.use((req, res, next) => {
 });
 
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     // Only disable cache for HTML and config files (they contain dynamic content)
@@ -1849,6 +1850,20 @@ app.post('/webhook', async (req, res) => {
     console.warn('[WEBHOOK POST] Unknown object type:', body?.object);
     res.sendStatus(404);
   }
+});
+
+// Global multer error handler — catches file-too-large errors and returns JSON
+app.use((err, req, res, next) => {
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'File too large. Maximum size is 5MB per image.' });
+  }
+  if (err && err.code === 'LIMIT_FILE_COUNT') {
+    return res.status(413).json({ error: 'Too many files. Maximum is 10 images per upload.' });
+  }
+  if (err && err.name === 'MulterError') {
+    return res.status(413).json({ error: err.message });
+  }
+  next(err);
 });
 
 if (require.main === module) {
