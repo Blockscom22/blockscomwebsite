@@ -946,6 +946,25 @@
     </div>
   </div>
 
+  <!-- Modal: Custom Alert -->
+  <div class="modal-overlay" id="customAlertModal" style="display:none; z-index: 9999;">
+    <div class="modal" style="max-width: 400px; text-align: center; padding: 32px 24px;">
+      <div
+        style="width: 48px; height: 48px; background: rgba(239, 68, 68, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; color: #ef4444;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <h2 style="margin-bottom: 12px; font-size: 1.2rem;">Action Required</h2>
+      <p id="customAlertMessage"
+        style="color:var(--text-dim); font-size: 0.95rem; margin-bottom: 24px; line-height: 1.5;"></p>
+      <button class="btn btn-primary" onclick="closeModal('customAlertModal')" style="width: 100%;">Understood</button>
+    </div>
+  </div>
+
   <!-- Modal: Admin User -->
   <div class="modal-overlay" id="adminUserModal">
     <div class="modal">
@@ -1196,7 +1215,7 @@
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px">
             <div style="font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px">Webhook Endpoint</div>
-            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">https://www.blockscom.xyz/webhook?page=${p.id}</code>
+            <code style="font-size:0.8rem; color:var(--text-muted); word-break:break-all">https://www.blockscom.xyz/webhook/${p.fb_page_id ? p.fb_page_id : '[YOUR_PAGE_ID]'}</code>
           </div>
           <div style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
@@ -1774,10 +1793,13 @@
     function copyWebhookLink(btn) {
       const link = document.getElementById('modal-webhook-link').innerText;
       if (link.includes('[YOUR_PAGE_ID]')) {
-        alert('Please enter your Facebook Page ID first before copying the webhook URL.');
+        showCustomAlert('Please enter your Facebook Page ID first before copying the webhook URL.');
         // Briefly focus the input to guide the user
         const pageIdInput = document.getElementById('p-id');
-        if (pageIdInput) pageIdInput.focus();
+        if (pageIdInput) {
+          closeModal('customAlertModal'); // To allow focus behind modal
+          pageIdInput.focus();
+        }
         return;
       }
 
@@ -1786,6 +1808,11 @@
         btn.innerText = 'Copied!';
         setTimeout(() => btn.innerText = originalText, 2000);
       });
+    }
+
+    function showCustomAlert(message) {
+      document.getElementById('customAlertMessage').innerText = message;
+      document.getElementById('customAlertModal').style.display = 'flex';
     }
 
     async function openPageModal(id = null) {
