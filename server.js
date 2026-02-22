@@ -459,8 +459,22 @@ app.post('/api/knowledge', requireAuth, async (req, res) => {
   let result;
 
   if (id) {
+    // Check if another entry (different ID) already has this title
+    const { data: existingTitle } = await supabase.from('knowledge_entries')
+      .select('id').eq('profile_id', req.user.id).eq('title', title).neq('id', id).single();
+    if (existingTitle) {
+      return res.status(400).json({ error: 'A skill with this title already exists. Please use a unique title.' });
+    }
+
     result = await supabase.from('knowledge_entries').update({ title, content }).eq('id', id).eq('profile_id', req.user.id);
   } else {
+    // Check if an entry already has this title
+    const { data: existingTitle } = await supabase.from('knowledge_entries')
+      .select('id').eq('profile_id', req.user.id).eq('title', title).single();
+    if (existingTitle) {
+      return res.status(400).json({ error: 'A skill with this title already exists. Please use a unique title.' });
+    }
+
     // Check limits before inserting a new skill
     const roleLimits = {
       'FREE': 3,
