@@ -39,11 +39,15 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.js') || path.endsWith('.css') || path.endsWith('.html')) {
+  setHeaders: (res, filePath) => {
+    // Only disable cache for HTML and config files (they contain dynamic content)
+    if (filePath.endsWith('.html') || filePath.endsWith('config-client.js')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
+    } else if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      // Cache static JS/CSS for 1 hour (browser will still revalidate)
+      res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
     }
   }
 }));
@@ -160,6 +164,26 @@ function isMasked(value) {
 
 // ==================== SAAS AUTH MIDDLEWARE ====================
 
+// In-memory profile cache (30s TTL) to avoid double DB call on every request
+const profileCache = new Map();
+const PROFILE_CACHE_TTL = 30000; // 30 seconds
+
+function getCachedProfile(userId) {
+  const entry = profileCache.get(userId);
+  if (entry && Date.now() - entry.ts < PROFILE_CACHE_TTL) return entry.profile;
+  return null;
+}
+function setCachedProfile(userId, profile) {
+  profileCache.set(userId, { profile, ts: Date.now() });
+}
+// Clean up expired profile cache entries every 60s
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of profileCache) {
+    if (now - entry.ts > PROFILE_CACHE_TTL) profileCache.delete(key);
+  }
+}, 60000);
+
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'No auth header' });
@@ -169,15 +193,21 @@ async function requireAuth(req, res, next) {
 
   if (error || !user) return res.status(401).json({ error: 'Invalid session' });
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-
+  // Check profile cache first
+  let profile = getCachedProfile(user.id);
   if (!profile) {
-    const { data: newProfile } = await supabase.from('profiles').insert([{ id: user.id, email: user.email, credits: 50, role: 'FREE' }]).select().single();
-    req.user = { ...user, profile: newProfile };
-  } else {
-    req.user = { ...user, profile };
+    const { data: dbProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+    if (!dbProfile) {
+      const { data: newProfile } = await supabase.from('profiles').insert([{ id: user.id, email: user.email, credits: 50, role: 'FREE' }]).select().single();
+      profile = newProfile;
+    } else {
+      profile = dbProfile;
+    }
+    setCachedProfile(user.id, profile);
   }
 
+  req.user = { ...user, profile };
   next();
 }
 
@@ -686,7 +716,7 @@ app.post('/api/inventory/tables/:id/import', requireAuth, async (req, res) => {
     const colDefs = (table.columns || []).map(c => `"${c.key}" (${c.label}, type: ${c.type})`).join(', ');
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-4o',
+      model: 'openai/gpt-5.2',
       messages: [
         {
           role: 'system', content: `You are a data parsing assistant. Extract rows from raw text/CSV and return a STRICT JSON array.
@@ -1020,7 +1050,7 @@ app.post('/api/logs/analyze', requireAuth, async (req, res) => {
     if (!resolvedApiKey) return res.status(500).json({ error: 'System OpenRouter API key not configured for analysis.' });
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-4o',
+      model: 'openai/gpt-5.2',
       messages: [
         {
           role: 'system',
@@ -1082,7 +1112,7 @@ app.get('/api/widget/config', rateLimit(60000, 30), async (req, res) => {
 
   if (error || !page || !page.is_enabled) return res.status(404).json({ error: 'widget not found' });
 
-  res.json({ ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'), theme: page.widget_theme || 'default' });
+  res.json({ ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model || 'openai/gpt-5.2', theme: page.widget_theme || 'default' });
 });
 
 app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
@@ -1120,10 +1150,14 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
       if (!allowed) return res.status(403).json({ error: 'origin not allowed' });
     }
 
-    const { data: kb } = await supabase
-      .from('knowledge_entries')
-      .select('content, title')
-      .eq('profile_id', page.profile_id);
+    // Fetch KB + Inventory in parallel (instead of sequential)
+    const [kbResult, invTablesResult] = await Promise.all([
+      supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id),
+      supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id)
+    ]);
+    const kb = kbResult.data;
+    const invTables = invTablesResult.data;
+
     // Separate PERSONALITY from other KB entries
     const personalityEntry = (kb || []).find(k => k.title === 'PERSONALITY');
     const personalityContent = personalityEntry ? personalityEntry.content : '';
@@ -1133,17 +1167,15 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
     const widgetUserCurrency = userProfile?.currency || 'PHP';
     const widgetCurrencySymbol = CURRENCY_SYMBOLS[widgetUserCurrency] || widgetUserCurrency;
 
-    // Fetch Inventory Data for Widget
-    const { data: invTables } = await supabase
-      .from('inventory_tables')
-      .select('id, name, columns')
-      .eq('profile_id', page.profile_id);
-
+    // Fetch all inventory rows in parallel (instead of N sequential queries)
     let productCatalog = "";
     let widgetProducts = [];
     if (invTables && invTables.length > 0) {
-      for (const tbl of invTables) {
-        const { data: invRows } = await supabase.from('inventory_rows').select('data').eq('table_id', tbl.id);
+      const rowResults = await Promise.all(
+        invTables.map(tbl => supabase.from('inventory_rows').select('data').eq('table_id', tbl.id))
+      );
+      invTables.forEach((tbl, i) => {
+        const invRows = rowResults[i].data;
         if (invRows && invRows.length > 0) {
           const cols = tbl.columns || [];
           productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
@@ -1151,7 +1183,7 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
           }).join('\n');
           widgetProducts = widgetProducts.concat(invRows.map(r => ({ _table: tbl.name, ...r.data })));
         }
-      }
+      });
     }
 
     const resolvedApiKey = process.env.OPENROUTER_API_KEY;
@@ -1269,30 +1301,22 @@ INSTRUCTIONS:
 
 // ==================== WEBHOOK LOGIC ====================
 
-// Helper to check daily limit
+// Helper to check daily limit — single RPC call instead of 3 sequential queries
 async function checkDailyLimit(profileId, role) {
-  if (role === 'ENTERPRISE' || role === 'ADMIN') return true;
-  const limit = role === 'PREMIUM' ? 2500 : 200;
-
-  const { data: pages } = await supabase.from('fb_pages').select('id').eq('profile_id', profileId);
-  if (!pages || pages.length === 0) return true;
-  const pageIds = pages.map(p => p.id);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const { count, error } = await supabase
-    .from('activity_logs')
-    .select('*', { count: 'exact', head: true })
-    .in('type', ['AUTO_REPLY', 'WIDGET_REPLY'])
-    .gte('created_at', today.toISOString())
-    .in('fb_page_id', pageIds);
-
-  if (error) {
-    console.error("Daily limit check error", error);
+  try {
+    const { data, error } = await supabase.rpc('check_daily_limit', {
+      p_profile_id: profileId,
+      p_role: role || 'FREE'
+    });
+    if (error) {
+      console.error('Daily limit RPC error:', error);
+      return true; // fail open
+    }
+    return data;
+  } catch (err) {
+    console.error('Daily limit check error:', err.message);
     return true; // fail open
   }
-  return count < limit;
 }
 
 // Helper to process a single message event
@@ -1341,25 +1365,27 @@ async function processMessage(event, fbPageId) {
       return;
     }
 
-    // 3. Build Context (Knowledge Base)
-    debugLog(`[DEBUG] Building knowledge base for user ${page.profile_id}...`);
+    // 3. Build Context (Knowledge Base) + 3b. Fetch Inventory — in parallel
+    debugLog(`[DEBUG] Building knowledge base + inventory for user ${page.profile_id}...`);
     let kbQuery = supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id);
 
     // Filter by specific files if defined
-    let kbTitles = [];
-
     if (Array.isArray(page.knowledge_base) && page.knowledge_base.length > 0) {
-      // All KB selections are now just skill titles (including auto-synced "Inventory: ..." entries)
-      kbTitles = page.knowledge_base.filter(item => typeof item === 'string');
-
+      const kbTitles = page.knowledge_base.filter(item => typeof item === 'string');
       if (kbTitles.length > 0) {
         debugLog(`[DEBUG] Filtering KB by titles: ${kbTitles.join(', ')}`);
         kbQuery = kbQuery.in('title', kbTitles);
       }
     }
 
-    const { data: kb, error: kbError } = await kbQuery;
-    if (kbError) console.error(`[ERROR] KB Query failed:`, kbError);
+    // Run KB + inventory table fetch in parallel
+    const [kbResult, invTablesResult] = await Promise.all([
+      kbQuery,
+      supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id)
+    ]);
+
+    const kb = kbResult.data;
+    if (kbResult.error) console.error(`[ERROR] KB Query failed:`, kbResult.error);
 
     // Always fetch PERSONALITY skill separately (it may not be in the selected KB titles)
     let personalityContent = '';
@@ -1374,21 +1400,23 @@ async function processMessage(event, fbPageId) {
     const context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
     debugLog(`[DEBUG] KB Context length: ${context.length} characters. Personality: ${personalityContent.length} chars`);
 
-    // 3b. Fetch Inventory Data from flexible tables
-    debugLog(`[DEBUG] Fetching inventory data for user ${page.profile_id}...`);
+    // Fetch all inventory rows in parallel (instead of N sequential queries)
     let productCatalog = "";
     try {
-      const { data: invTables } = await supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id);
+      const invTables = invTablesResult.data;
       if (invTables && invTables.length > 0) {
-        for (const tbl of invTables) {
-          const { data: invRows } = await supabase.from('inventory_rows').select('data').eq('table_id', tbl.id);
+        const rowResults = await Promise.all(
+          invTables.map(tbl => supabase.from('inventory_rows').select('data').eq('table_id', tbl.id))
+        );
+        invTables.forEach((tbl, i) => {
+          const invRows = rowResults[i].data;
           if (invRows && invRows.length > 0) {
             const cols = tbl.columns || [];
             productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
               return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
             }).join('\n');
           }
-        }
+        });
       }
     } catch (invErr) {
       console.warn('[WARN] Inventory query failed:', invErr.message);
