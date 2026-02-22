@@ -3,6 +3,7 @@ const axios = require('axios');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
+const compression = require('compression');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -37,6 +38,7 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(compression());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
@@ -94,6 +96,26 @@ setInterval(() => {
     if (now - entry.start > 300000) rateLimitMap.delete(key);
   }
 }, 300000);
+
+// Widget config cache (60s TTL) — avoids hitting Supabase on every page load
+const widgetConfigCache = new Map();
+const WIDGET_CONFIG_TTL = 60000; // 60 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of widgetConfigCache) {
+    if (now - entry.ts > WIDGET_CONFIG_TTL) widgetConfigCache.delete(key);
+  }
+}, 60000);
+
+// KB + Inventory context cache (45s TTL) — avoids re-fetching during burst conversations
+const kbCache = new Map();
+const KB_CACHE_TTL = 45000; // 45 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of kbCache) {
+    if (now - entry.ts > KB_CACHE_TTL) kbCache.delete(key);
+  }
+}, 60000);
 
 // Facebook Webhook Signature Verification (X-Hub-Signature-256)
 const FB_APP_SECRET = process.env.FB_APP_SECRET || '';
@@ -1104,6 +1126,12 @@ app.get('/api/widget/config', rateLimit(60000, 30), async (req, res) => {
   const key = String(req.query.key || '');
   if (!key) return res.status(400).json({ error: 'missing key' });
 
+  // Check cache first
+  const cached = widgetConfigCache.get(key);
+  if (cached && Date.now() - cached.ts < WIDGET_CONFIG_TTL) {
+    return res.json(cached.data);
+  }
+
   const { data: page, error } = await supabase
     .from('fb_pages')
     .select('id,name,ai_model,is_enabled,widget_key,allowed_domains,profile_id,widget_theme,widget_name')
@@ -1112,7 +1140,9 @@ app.get('/api/widget/config', rateLimit(60000, 30), async (req, res) => {
 
   if (error || !page || !page.is_enabled) return res.status(404).json({ error: 'widget not found' });
 
-  res.json({ ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model || 'openai/gpt-5.2', theme: page.widget_theme || 'default' });
+  const response = { ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model || 'openai/gpt-5.2', theme: page.widget_theme || 'default' };
+  widgetConfigCache.set(key, { data: response, ts: Date.now() });
+  res.json(response);
 });
 
 app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
@@ -1150,41 +1180,55 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
       if (!allowed) return res.status(403).json({ error: 'origin not allowed' });
     }
 
-    // Fetch KB + Inventory in parallel (instead of sequential)
-    const [kbResult, invTablesResult] = await Promise.all([
-      supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id),
-      supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id)
-    ]);
-    const kb = kbResult.data;
-    const invTables = invTablesResult.data;
+    // Check KB+Inventory cache first (avoids repeated Supabase calls during burst conversations)
+    const cacheKey = `widget:${page.profile_id}`;
+    let personalityContent, context, productCatalog = "", widgetProducts = [];
+    const cachedKb = kbCache.get(cacheKey);
 
-    // Separate PERSONALITY from other KB entries
-    const personalityEntry = (kb || []).find(k => k.title === 'PERSONALITY');
-    const personalityContent = personalityEntry ? personalityEntry.content : '';
-    const context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
+    if (cachedKb && Date.now() - cachedKb.ts < KB_CACHE_TTL) {
+      personalityContent = cachedKb.personalityContent;
+      context = cachedKb.context;
+      productCatalog = cachedKb.productCatalog;
+      widgetProducts = cachedKb.widgetProducts;
+    } else {
+      // Fetch KB + Inventory in parallel
+      const [kbResult, invTablesResult] = await Promise.all([
+        supabase.from('knowledge_entries').select('content, title').eq('profile_id', page.profile_id),
+        supabase.from('inventory_tables').select('id, name, columns').eq('profile_id', page.profile_id)
+      ]);
+      const kb = kbResult.data;
+      const invTables = invTablesResult.data;
+
+      // Separate PERSONALITY from other KB entries
+      const personalityEntry = (kb || []).find(k => k.title === 'PERSONALITY');
+      personalityContent = personalityEntry ? personalityEntry.content : '';
+      context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
+
+      // Fetch all inventory rows in a single query instead of N parallel queries
+      if (invTables && invTables.length > 0) {
+        const tableIds = invTables.map(t => t.id);
+        const { data: allRows } = await supabase.from('inventory_rows').select('data, table_id').in('table_id', tableIds);
+        const rowsByTable = {};
+        (allRows || []).forEach(r => { (rowsByTable[r.table_id] = rowsByTable[r.table_id] || []).push(r); });
+        invTables.forEach(tbl => {
+          const invRows = rowsByTable[tbl.id] || [];
+          if (invRows.length > 0) {
+            const cols = tbl.columns || [];
+            productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
+              return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
+            }).join('\n');
+            widgetProducts = widgetProducts.concat(invRows.map(r => ({ _table: tbl.name, ...r.data })));
+          }
+        });
+      }
+
+      // Cache the result
+      kbCache.set(cacheKey, { personalityContent, context, productCatalog, widgetProducts, ts: Date.now() });
+    }
 
     // Get the user's default currency
     const widgetUserCurrency = userProfile?.currency || 'PHP';
     const widgetCurrencySymbol = CURRENCY_SYMBOLS[widgetUserCurrency] || widgetUserCurrency;
-
-    // Fetch all inventory rows in parallel (instead of N sequential queries)
-    let productCatalog = "";
-    let widgetProducts = [];
-    if (invTables && invTables.length > 0) {
-      const rowResults = await Promise.all(
-        invTables.map(tbl => supabase.from('inventory_rows').select('data').eq('table_id', tbl.id))
-      );
-      invTables.forEach((tbl, i) => {
-        const invRows = rowResults[i].data;
-        if (invRows && invRows.length > 0) {
-          const cols = tbl.columns || [];
-          productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
-            return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
-          }).join('\n');
-          widgetProducts = widgetProducts.concat(invRows.map(r => ({ _table: tbl.name, ...r.data })));
-        }
-      });
-    }
 
     const resolvedApiKey = process.env.OPENROUTER_API_KEY;
     if (!resolvedApiKey) return res.status(500).json({ error: 'missing OpenRouter key' });
@@ -1400,17 +1444,18 @@ async function processMessage(event, fbPageId) {
     const context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
     debugLog(`[DEBUG] KB Context length: ${context.length} characters. Personality: ${personalityContent.length} chars`);
 
-    // Fetch all inventory rows in parallel (instead of N sequential queries)
+    // Fetch all inventory rows in a single query instead of N parallel queries
     let productCatalog = "";
     try {
       const invTables = invTablesResult.data;
       if (invTables && invTables.length > 0) {
-        const rowResults = await Promise.all(
-          invTables.map(tbl => supabase.from('inventory_rows').select('data').eq('table_id', tbl.id))
-        );
-        invTables.forEach((tbl, i) => {
-          const invRows = rowResults[i].data;
-          if (invRows && invRows.length > 0) {
+        const tableIds = invTables.map(t => t.id);
+        const { data: allRows } = await supabase.from('inventory_rows').select('data, table_id').in('table_id', tableIds);
+        const rowsByTable = {};
+        (allRows || []).forEach(r => { (rowsByTable[r.table_id] = rowsByTable[r.table_id] || []).push(r); });
+        invTables.forEach(tbl => {
+          const invRows = rowsByTable[tbl.id] || [];
+          if (invRows.length > 0) {
             const cols = tbl.columns || [];
             productCatalog += `\n\nINVENTORY - ${tbl.name}:\n` + invRows.map(r => {
               return '- ' + cols.map(c => `${c.label}: ${r.data[c.key] ?? 'N/A'}`).join(', ');
