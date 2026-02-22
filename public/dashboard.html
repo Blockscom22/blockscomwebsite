@@ -919,12 +919,15 @@
           <div>
             <label>AI Intelligence Model</label>
             <select id="p-model" class="input">
-              <option value="openai/gpt-oss-120b" data-tier="free">Free User 1</option>
-              <option value="openai/gpt-oss-120b:free" data-tier="free">Free User 2</option>
-              <option value="z-ai/glm-4.7-flash" data-tier="paid">Thinker</option>
-              <option value="openai/gpt-5-mini" data-tier="paid">Thinker Pro</option>
-              <option value="openai/gpt-5.2-chat" data-tier="paid">Smart</option>
-              <option value="anthropic/claude-opus-4.6" data-tier="paid">Hyper Smart</option>
+              <option value="openai/gpt-oss-20b:free" data-tier="free">Free Light Model 1</option>
+              <option value="openai/gpt-oss-120b:free" data-tier="free">Free Light Model 2</option>
+              <option value="stepfun/step-3.5-flash:free" data-tier="free">Free Light Model 3</option>
+              <option value="arcee-ai/trinity-large-preview:free" data-tier="free">Free Light Model 4 (Default)</option>
+              <option value="openai/gpt-oss-20b" data-tier="paid">Mid Model 1 (Default)</option>
+              <option value="openai/gpt-oss-120b" data-tier="paid">Mid Model 2</option>
+              <option value="google/gemini-2.5-flash-lite" data-tier="paid">Flash Light Model</option>
+              <option value="google/gemini-3-flash-preview" data-tier="paid">Fast Flash Model</option>
+              <option value="openai/gpt-5-nano" data-tier="paid">High Flash Model</option>
             </select>
             <div id="model-restriction-note" style="display:none; font-size:0.7rem; color:#f59e0b; margin-top:4px">⚠
               FREE tier can only use Free User models. Upgrade to unlock premium models.</div>
@@ -2103,10 +2106,18 @@
           document.getElementById('p-id').value = p.fb_page_id;
           updateWebhookUrl(p.id);
 
-          let modelVal = p.ai_model || 'openai/gpt-4o';
-          if (modelVal === 'openai/gpt-5.2') modelVal = 'openai/gpt-4o';
-          if (modelVal === 'anthropic/claude-3-sonnet') modelVal = 'anthropic/claude-3.5-sonnet';
-          if (modelVal === 'google/gemini-pro') modelVal = 'google/gemini-2.5-pro';
+          let modelVal = p.ai_model || 'arcee-ai/trinity-large-preview:free';
+          // Migrate legacy model IDs
+          if (modelVal === 'openai/gpt-5.2') modelVal = 'openai/gpt-5-nano';
+          if (modelVal === 'anthropic/claude-3-sonnet') modelVal = 'openai/gpt-oss-20b';
+          if (modelVal === 'anthropic/claude-3.5-sonnet') modelVal = 'openai/gpt-oss-20b';
+          if (modelVal === 'google/gemini-pro') modelVal = 'google/gemini-2.5-flash-lite';
+          if (modelVal === 'google/gemini-2.5-pro') modelVal = 'google/gemini-2.5-flash-lite';
+          if (modelVal === 'openai/gpt-4o') modelVal = 'openai/gpt-oss-20b';
+          if (modelVal === 'z-ai/glm-4.7-flash') modelVal = 'openai/gpt-oss-20b';
+          if (modelVal === 'openai/gpt-5-mini') modelVal = 'openai/gpt-5-nano';
+          if (modelVal === 'openai/gpt-5.2-chat') modelVal = 'openai/gpt-5-nano';
+          if (modelVal === 'anthropic/claude-opus-4.6') modelVal = 'openai/gpt-5-nano';
           document.getElementById('p-model').value = modelVal;
 
           // Never prefill secret inputs with masked values; keep blank and show saved state in placeholder
@@ -2138,9 +2149,9 @@
         }
       });
       restrictionNote.style.display = isFree ? 'block' : 'none';
-      // If FREE user currently has a paid model selected, force to first free model
+      // If FREE user currently has a paid model selected, force to default free model
       if (isFree && modelSelect.selectedOptions[0]?.dataset.tier === 'paid') {
-        modelSelect.value = 'openai/gpt-oss-120b';
+        modelSelect.value = 'arcee-ai/trinity-large-preview:free';
       }
 
       document.getElementById('pageModal').style.display = 'flex';

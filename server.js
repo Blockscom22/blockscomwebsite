@@ -814,7 +814,7 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
     if (!resolvedApiKey) return res.status(500).json({ error: 'missing OpenRouter key' });
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'),
+      model: page.ai_model || 'arcee-ai/trinity-large-preview:free',
       messages: [
         {
           role: 'system', content: `You are Blockscom website assistant for ${page.name}. 
@@ -1068,7 +1068,7 @@ async function processMessage(event, fbPageId) {
     const aiRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: page.ai_model === 'openai/gpt-5.2' ? 'openai/gpt-4o' : (page.ai_model || 'openai/gpt-4o'), // Fallback model
+        model: page.ai_model || 'arcee-ai/trinity-large-preview:free', // Fallback model
         messages: [
           {
             role: 'system',
