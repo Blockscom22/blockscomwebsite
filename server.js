@@ -304,9 +304,9 @@ app.post('/api/pages', requireAuth, async (req, res) => {
     const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base, widget_name } = req.body;
 
     // Enforce model restrictions for FREE users
-    const FREE_MODELS = ['arcee-ai/trinity-large-preview:free', 'stepfun/step-3.5-flash:free'];
+    const FREE_MODELS = ['openai/gpt-oss-safeguard-20b'];
     const resolvedModel = (req.user.profile.role === 'FREE' && !FREE_MODELS.includes(ai_model))
-      ? 'arcee-ai/trinity-large-preview:free'
+      ? 'openai/gpt-oss-safeguard-20b'
       : ai_model;
 
     if (id) {
@@ -1303,7 +1303,8 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
     if (error || !page || !page.is_enabled) return res.status(404).json({ error: 'widget not found' });
 
     const userProfile = page.profiles;
-    if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) <= 0) {
+    const creditCost = ['openai/gpt-oss-120b', 'google/gemini-2.5-flash-lite', 'google/gemini-3-flash-preview', 'openai/gpt-5-nano'].includes(page.ai_model) ? 2 : 1;
+    if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) < creditCost) {
       return res.status(402).json({ error: 'out of credits' });
     }
 
@@ -1420,7 +1421,7 @@ INSTRUCTIONS:
     ];
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: page.ai_model || 'arcee-ai/trinity-large-preview:free',
+      model: page.ai_model || 'openai/gpt-oss-safeguard-20b',
       messages: aiMessages,
       tools: [{
         type: "function",
@@ -1491,20 +1492,20 @@ INSTRUCTIONS:
 
     // Save memory & logs
     await Promise.all([
-      supabase.from('activity_logs').insert([{ fb_page_id: page.id, type: 'WIDGET_REPLY', payload: { in: message, out: reply } }]),
+      supabase.from('activity_logs').insert([{ fb_page_id: page.id, type: 'WIDGET_REPLY', payload: { in: message, out: reply }, credits_spent: creditCost }]),
       supabase.from('chat_memory').insert([
         { fb_page_id: page.id, session_id: sessionId, role: 'user', content: message },
         { fb_page_id: page.id, session_id: sessionId, role: 'assistant', content: reply }
       ])
     ]);
 
-    // Deduct 1 credit atomically for widget replies
+    // Deduct credits atomically for widget replies
     if (userProfile && userProfile.role !== 'ADMIN') {
       try {
-        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
+        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: creditCost }).single();
       } catch (_rpcErr) {
         // Fallback if RPC function not yet created in Supabase
-        const newCredits = Math.max(0, (userProfile.credits || 0) - 1);
+        const newCredits = Math.max(0, (userProfile.credits || 0) - creditCost);
         await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
       }
     }
@@ -1627,8 +1628,8 @@ async function processMessage(event, fbPageId) {
       return; // Stop further processing, this was a system command.
     }
     // -----------------------------------
-
-    if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) <= 0) {
+    const creditCost = ['openai/gpt-oss-120b', 'google/gemini-2.5-flash-lite', 'google/gemini-3-flash-preview', 'openai/gpt-5-nano'].includes(page.ai_model) ? 2 : 1;
+    if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) < creditCost) {
       debugLog(`[DEBUG] User ${userProfile.email} out of credits.`);
       return;
     }
@@ -1779,7 +1780,7 @@ async function processMessage(event, fbPageId) {
     const aiRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: page.ai_model || 'arcee-ai/trinity-large-preview:free', // Fallback model
+        model: page.ai_model || 'openai/gpt-oss-safeguard-20b', // Fallback model
         messages: aiMessages,
         tools: [{
           type: "function",
@@ -1956,7 +1957,8 @@ async function processMessage(event, fbPageId) {
       supabase.from('activity_logs').insert([{
         fb_page_id: page.id,
         type: 'AUTO_REPLY',
-        payload: { in: messageText, out: replyText, sender: senderId }
+        payload: { in: messageText, out: replyText, sender: senderId },
+        credits_spent: creditCost
       }]),
       supabase.from('chat_memory').insert([
         { fb_page_id: page.id, session_id: senderId, role: 'user', content: messageText },
@@ -1966,10 +1968,10 @@ async function processMessage(event, fbPageId) {
 
     if (userProfile && userProfile.role !== 'ADMIN') {
       try {
-        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: 1 }).single();
+        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: creditCost }).single();
       } catch (_rpcErr) {
         // Fallback if RPC function not yet created in Supabase
-        const newCredits = Math.max(0, (userProfile.credits || 0) - 1);
+        const newCredits = Math.max(0, (userProfile.credits || 0) - creditCost);
         await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
       }
     }
