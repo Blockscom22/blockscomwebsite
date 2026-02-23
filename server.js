@@ -1536,13 +1536,14 @@ async function checkDailyLimit(profileId, role) {
 }
 
 // Helper to process a single message event
-async function processMessage(event, fbPageId) {
+async function processMessage(event, fbPageId, retryId = null) {
   debugLog('--- START PROCESS MESSAGE ---');
   const senderId = event.sender.id;
   const messageText = event.message.text;
   const targetPageId = String(fbPageId);
+  const isRetry = !!retryId;
 
-  debugLog(`[DEBUG] Processing message from ${senderId} to Page ID ${targetPageId}`);
+  debugLog(`[DEBUG] Processing message from ${senderId} to Page ID ${targetPageId}${isRetry ? ' (RETRY #' + retryId + ')' : ''}`);
 
   try {
     debugLog(`[DEBUG] Fetching config for Page ID: ${targetPageId}`);
@@ -1817,7 +1818,8 @@ async function processMessage(event, fbPageId) {
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://www.blockscom.xyz', // OpenRouter requirements
           'X-Title': 'Blockscom AI'
-        }
+        },
+        timeout: 8000 // 8s timeout to avoid Vercel function timeout
       }
     );
 
@@ -1982,33 +1984,166 @@ async function processMessage(event, fbPageId) {
       errorDetail = JSON.stringify(err.response.data?.error || err.response.data);
     }
 
-    // Log error to DB so user can see it
-    if (targetPageId) {
-      const { data: errPage } = await supabase.from('fb_pages').select('id, access_token').eq('fb_page_id', targetPageId).single();
-      if (errPage) {
-        await supabase.from('activity_logs').insert([{
-          fb_page_id: errPage.id,
-          type: 'ERROR',
-          payload: { in: messageText, out: 'Failed to reply: ' + errorDetail.substring(0, 200), sender: senderId }
-        }]);
+    // If this is already a retry, update the retry record
+    if (isRetry && retryId) {
+      const { data: retryRow } = await supabase.from('message_retries').select('attempts, max_attempts').eq('id', retryId).single();
+      const newAttempts = (retryRow?.attempts || 0) + 1;
+      const exhausted = newAttempts >= (retryRow?.max_attempts || 3);
 
-        // Try to send a fallback message so it's not completely dead
-        try {
-          const token = decryptSecret(errPage.access_token);
-          if (token) {
-            await axios.post(
-              `https://graph.facebook.com/v22.0/me/messages`,
-              { recipient: { id: senderId }, message: { text: "Sorry, I am having trouble processing that right now. Please try again later." } },
-              { params: { access_token: token } }
-            );
+      await supabase.from('message_retries').update({
+        attempts: newAttempts,
+        last_error: errorDetail.substring(0, 500),
+        status: exhausted ? 'failed' : 'pending',
+        next_retry_at: exhausted ? null : new Date(Date.now() + 60000).toISOString()
+      }).eq('id', retryId);
+
+      // Only send fallback message when ALL retries are exhausted
+      if (exhausted && targetPageId) {
+        const { data: errPage } = await supabase.from('fb_pages').select('id, access_token').eq('fb_page_id', targetPageId).single();
+        if (errPage) {
+          await supabase.from('activity_logs').insert([{
+            fb_page_id: errPage.id,
+            type: 'ERROR',
+            payload: { in: messageText, out: 'Failed after ' + newAttempts + ' attempts: ' + errorDetail.substring(0, 200), sender: senderId }
+          }]);
+          try {
+            const token = decryptSecret(errPage.access_token);
+            if (token) {
+              await axios.post(
+                `https://graph.facebook.com/v22.0/me/messages`,
+                { recipient: { id: senderId }, message: { text: "Sorry, I had trouble processing your message. Please try again." } },
+                { params: { access_token: token } }
+              );
+            }
+          } catch (fbErr) {
+            console.error("Failed to send fallback message:", fbErr.message);
           }
-        } catch (fbErr) {
-          console.error("Failed to send fallback message:", fbErr.message);
+        }
+      } else {
+        debugLog(`[RETRY] Attempt ${newAttempts} failed for retry ${retryId}. Will retry again.`);
+      }
+      return;
+    }
+
+    // First failure: queue for retry instead of sending fallback
+    try {
+      await supabase.from('message_retries').insert([{
+        fb_page_id: targetPageId,
+        sender_id: senderId,
+        message_text: messageText,
+        attempts: 1,
+        last_error: errorDetail.substring(0, 500),
+        status: 'pending',
+        next_retry_at: new Date(Date.now() + 60000).toISOString() // retry in 1 min
+      }]);
+      debugLog(`[RETRY] Queued message from ${senderId} for retry in 1 minute.`);
+
+      // Log a non-alarming entry (user sees "retrying" not "failed")
+      if (targetPageId) {
+        const { data: errPage } = await supabase.from('fb_pages').select('id').eq('fb_page_id', targetPageId).single();
+        if (errPage) {
+          await supabase.from('activity_logs').insert([{
+            fb_page_id: errPage.id,
+            type: 'RETRY_QUEUED',
+            payload: { in: messageText, out: 'AI timed out — auto-retrying in 1 minute', sender: senderId }
+          }]);
+        }
+      }
+    } catch (queueErr) {
+      console.error('Failed to queue retry:', queueErr.message);
+      // Last resort: send fallback message
+      if (targetPageId) {
+        const { data: errPage } = await supabase.from('fb_pages').select('id, access_token').eq('fb_page_id', targetPageId).single();
+        if (errPage) {
+          await supabase.from('activity_logs').insert([{
+            fb_page_id: errPage.id,
+            type: 'ERROR',
+            payload: { in: messageText, out: 'Failed to reply: ' + errorDetail.substring(0, 200), sender: senderId }
+          }]);
+          try {
+            const token = decryptSecret(errPage.access_token);
+            if (token) {
+              await axios.post(
+                `https://graph.facebook.com/v22.0/me/messages`,
+                { recipient: { id: senderId }, message: { text: "Sorry, I am having trouble processing that right now. Please try again later." } },
+                { params: { access_token: token } }
+              );
+            }
+          } catch (fbErr) {
+            console.error("Failed to send fallback message:", fbErr.message);
+          }
         }
       }
     }
   }
 }
+
+// ==================== RETRY CRON ENDPOINT ====================
+// Called every 1 minute by Vercel Cron to process failed webhook messages
+
+app.get('/api/cron/retry', async (req, res) => {
+  // Verify cron secret (Vercel sends this header for cron jobs)
+  const cronSecret = req.headers['authorization'];
+  if (cronSecret !== `Bearer ${process.env.CRON_SECRET || ''}` && process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // Fetch pending retries that are due
+    const { data: retries, error } = await supabase
+      .from('message_retries')
+      .select('*')
+      .eq('status', 'pending')
+      .lte('next_retry_at', new Date().toISOString())
+      .order('created_at', { ascending: true })
+      .limit(5); // Process max 5 per cron tick to stay within timeout
+
+    if (error) throw error;
+    if (!retries || retries.length === 0) {
+      return res.json({ processed: 0, message: 'No pending retries' });
+    }
+
+    console.log(`[CRON RETRY] Processing ${retries.length} pending message(s)...`);
+    let processed = 0;
+
+    for (const retry of retries) {
+      // Mark as processing to prevent double-pickup
+      await supabase.from('message_retries').update({ status: 'processing' }).eq('id', retry.id);
+
+      try {
+        // Reconstruct the event object for processMessage
+        const event = {
+          sender: { id: retry.sender_id },
+          message: { text: retry.message_text }
+        };
+
+        await processMessage(event, retry.fb_page_id, retry.id);
+
+        // If processMessage didn't throw, mark as success
+        const { data: check } = await supabase.from('message_retries').select('status').eq('id', retry.id).single();
+        if (check && check.status === 'processing') {
+          // Still 'processing' means it succeeded (error handler would have changed it)
+          await supabase.from('message_retries').update({ status: 'success' }).eq('id', retry.id);
+        }
+        processed++;
+      } catch (retryErr) {
+        console.error(`[CRON RETRY] Failed to process retry ${retry.id}:`, retryErr.message);
+        // processMessage's catch block already handles updating the retry record
+      }
+    }
+
+    // Cleanup: delete completed/failed retries older than 24 hours
+    await supabase.from('message_retries')
+      .delete()
+      .in('status', ['success', 'failed'])
+      .lt('created_at', new Date(Date.now() - 86400000).toISOString());
+
+    res.json({ processed, total: retries.length });
+  } catch (e) {
+    console.error('[CRON RETRY] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('/webhook', async (req, res) => {
   const mode = req.query['hub.mode'];
