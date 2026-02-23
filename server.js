@@ -1356,7 +1356,15 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
       // Separate PERSONALITY from other KB entries
       const personalityEntry = (kb || []).find(k => k.title === 'PERSONALITY');
       personalityContent = personalityEntry ? personalityEntry.content : '';
-      context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
+
+      const activeSkills = (kb || []).filter(k => k.title !== 'PERSONALITY');
+      if (activeSkills.length > 0) {
+        context = "```markdown\n# MASTER KNOWLEDGE BASE DOCUMENT\n\n" +
+          activeSkills.map(k => `## Skill: ${k.title}\n${k.content}`).join('\n\n---\n\n') +
+          "\n```";
+      } else {
+        context = "";
+      }
 
       // Fetch all inventory rows in a single query instead of N parallel queries
       if (invTables && invTables.length > 0) {
@@ -1692,7 +1700,14 @@ async function processMessage(event, fbPageId) {
         if (personalityEntry) personalityContent = personalityEntry.content;
       }
 
-      context = (kb || []).filter(k => k.title !== 'PERSONALITY').map(k => k.content).join('\n\n');
+      const activeSkills = (kb || []).filter(k => k.title !== 'PERSONALITY');
+      if (activeSkills.length > 0) {
+        context = "```markdown\n# MASTER KNOWLEDGE BASE DOCUMENT\n\n" +
+          activeSkills.map(k => `## Skill: ${k.title}\n${k.content}`).join('\n\n---\n\n') +
+          "\n```";
+      } else {
+        context = "";
+      }
       debugLog(`[DEBUG] KB Context length: ${context.length} characters. Personality: ${personalityContent.length} chars`);
 
       // Fetch all inventory rows in a single query instead of N parallel queries
