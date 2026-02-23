@@ -303,11 +303,8 @@ app.post('/api/pages', requireAuth, async (req, res) => {
   try {
     const { id, name, fb_page_id, verify_token, access_token, ai_model, knowledge_base, widget_name } = req.body;
 
-    // Enforce model restrictions for FREE users
-    const FREE_MODELS = ['arcee-ai/trinity-large-preview:free', 'stepfun/step-3.5-flash:free'];
-    const resolvedModel = (req.user.profile.role === 'FREE' && !FREE_MODELS.includes(ai_model))
-      ? 'arcee-ai/trinity-large-preview:free'
-      : ai_model;
+    // Only one model is supported now
+    const resolvedModel = ai_model || 'openai/gpt-oss-safeguard-20b';
 
     if (id) {
       // Update
@@ -801,7 +798,7 @@ app.post('/api/inventory/tables/:id/import', requireAuth, async (req, res) => {
     const colDefs = (table.columns || []).map(c => `"${c.key}" (${c.label}, type: ${c.type})`).join(', ');
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-5.2',
+      model: 'openai/gpt-oss-safeguard-20b',
       messages: [
         {
           role: 'system', content: `You are a data parsing assistant. Extract rows from raw text/CSV and return a STRICT JSON array.
@@ -1214,7 +1211,7 @@ app.post('/api/logs/analyze', requireAuth, async (req, res) => {
     if (!resolvedApiKey) return res.status(500).json({ error: 'System OpenRouter API key not configured for analysis.' });
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-5.2',
+      model: 'openai/gpt-oss-safeguard-20b',
       messages: [
         {
           role: 'system',
@@ -1282,7 +1279,7 @@ app.get('/api/widget/config', rateLimit(60000, 30), async (req, res) => {
 
   if (error || !page || !page.is_enabled) return res.status(404).json({ error: 'widget not found' });
 
-  const response = { ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model || 'openai/gpt-5.2', theme: page.widget_theme || 'default' };
+  const response = { ok: true, pageName: page.name, widgetName: page.widget_name, model: page.ai_model || 'openai/gpt-oss-safeguard-20b', theme: page.widget_theme || 'default' };
   widgetConfigCache.set(key, { data: response, ts: Date.now() });
   res.json(response);
 });
@@ -1420,7 +1417,7 @@ INSTRUCTIONS:
     ];
 
     const aiRes = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: page.ai_model || 'arcee-ai/trinity-large-preview:free',
+      model: page.ai_model || 'openai/gpt-oss-safeguard-20b',
       messages: aiMessages,
       tools: [{
         type: "function",
@@ -1780,7 +1777,7 @@ async function processMessage(event, fbPageId, retryId = null) {
     const aiRes = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: page.ai_model || 'arcee-ai/trinity-large-preview:free', // Fallback model
+        model: page.ai_model || 'openai/gpt-oss-safeguard-20b', // Fallback model
         messages: aiMessages,
         tools: [{
           type: "function",
