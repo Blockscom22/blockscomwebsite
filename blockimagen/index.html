@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-[#050505] text-white overflow-x-hidden antialiased">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nano Banana Studio | Blockscom Media</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="../../images/logo.jpg" type="image/jpeg">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- GSAP & Lenis -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/studio-freight/lenis@1.0.29/bundled/lenis.min.js"></script>
+
+  <!-- Original Styles (Modified) -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              black: '#050505',
+              dark: '#0A0A0A',
+              gray: '#1F1F1F',
+              accent: '#FFFFFF',
+              dim: '#888888'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Space Grotesk', 'monospace'],
+          },
+          backgroundImage: {
+            'grid-pattern': "linear-gradient(to right, #1f1f1f 1px, transparent 1px), linear-gradient(to bottom, #1f1f1f 1px, transparent 1px)",
+          }
+        }
+      }
+    }
+  </script>
+</head>
+
+<body class="selection:bg-white selection:text-black">
+
+  <!-- Custom Cursor -->
+  <div class="cursor-dot hidden md:block"></div>
+  <div class="cursor-outline hidden md:block"></div>
+
+  <!-- Noise Overlay -->
+  <div class="noise-bg"></div>
+
+  <!-- Scroll Progress -->
+  <div class="progress-bar"></div>
+
+  <main class="w-full relative min-h-screen pt-28 pb-40 px-6 md:px-8">
+    <!-- Background Grid -->
+    <div class="absolute inset-0 opacity-[0.03] bg-grid-pattern grid-bg pointer-events-none fixed"></div>
+
+    <div class="max-w-[1600px] mx-auto relative z-10 flex flex-col gap-8">
+      <!-- Header Compact -->
+      <div
+        class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-white/5">
+        <div>
+          <h1 class="text-3xl font-bold tracking-tighter">PANTASM <span class="text-brand-dim">$MONEYMAKING</span></h1>
+          <div class="flex items-center gap-3 text-xs font-mono text-gray-400 mt-2">
+            <span>Browser Only</span>
+            <span class="w-1 h-1 bg-gray-600 rounded-full"></span>
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span id="status">Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="relative group z-[60]">
+        <div
+          class="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full cursor-pointer transition-colors">
+          <span class="text-xs font-mono uppercase tracking-widest text-gray-300"
+            id="current-feature-label">Generate</span>
+          <i data-lucide="chevron-down" class="w-3 h-3 text-gray-500"></i>
+        </div>
+        <div
+          class="absolute top-12 right-0 bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex flex-col min-w-[160px]"
+          id="feature-tabs">
+          <button type="button"
+            class="tab-btn active text-left px-4 py-3 hover:bg-white/5 text-xs text-gray-400 font-mono tracking-wide transition-colors"
+            data-feature-tab="generate">Generate</button>
+          <button type="button"
+            class="tab-btn text-left px-4 py-3 hover:bg-white/5 border-t border-white/5 text-xs text-gray-400 font-mono tracking-wide transition-colors"
+            data-feature-tab="recreate">Recreate</button>
+          <button type="button"
+            class="tab-btn text-left px-4 py-3 hover:bg-white/5 border-t border-white/5 text-xs text-gray-400 font-mono tracking-wide transition-colors"
+            data-feature-tab="product">Product</button>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start">
+
+      <!-- Left Sidebar: Settings Panel (Col Span 3) -->
+      <!-- Reduced col-span for cleaner look now that prompt is gone -->
+      <div class="lg:col-span-3 flex flex-col gap-6 lg:sticky lg:top-32 h-fit z-20">
+        <section class="glass-panel p-5 rounded-2xl border border-white/10 bg-[#0A0A0A]/80 backdrop-blur-xl">
+          <form id="generator-form" class="form flex flex-col gap-5">
+
+            <div class="flex justify-between items-center">
+              <h3 class="text-xs font-mono font-bold uppercase text-gray-500">Settings</h3>
+              <button class="text-[10px] text-gray-500 hover:text-white transition-colors" type="button"
+                id="clear">Reset</button>
+            </div>
+
+            <!-- Version -->
+            <div class="field">
+              <label for="version-select"
+                class="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Mode</label>
+              <div class="relative">
+                <select id="version-select" form="generator-form"
+                  class="appearance-none w-full bg-black/30 border border-white/10 hover:bg-white/10 text-gray-300 text-[10px] rounded-lg pl-3 pr-6 py-2.5 focus:outline-none transition-colors cursor-pointer font-mono uppercase tracking-wide">
+                  <option value="TEST">Test (5 Tries)</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+                <i data-lucide="chevron-down"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none"></i>
+              </div>
+            </div>
+
+            <!-- Admin Password (Hidden by default) -->
+            <div class="field hidden" id="admin-password-block">
+              <label for="admin-password"
+                class="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1.5 block">Admin
+                Password</label>
+              <div class="relative">
+                <input type="password" id="admin-password" autocomplete="off" placeholder="Enter password..."
+                  class="w-full bg-black/30 border border-amber-500/30 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-500/60 transition-colors font-mono">
+                <button
+                  class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 hover:text-white transition-colors uppercase font-mono tracking-widest"
+                  type="button" id="toggle-admin-key">
+                  Show
+                </button>
+              </div>
+            </div>
+
+
+
+            <div class="tab-panel" data-feature-panel="generate">
+              <!-- Drag & Drop Areas -->
+              <div class="flex flex-col gap-3">
+                <!-- Reference Images -->
+                <div class="field">
+                  <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Reference (Max 4)</label>
+                  <div
+                    class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer"
+                    id="drop-reference">
+                    <input type="file" id="reference-images" accept="image/*" multiple
+                      class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                    <i data-lucide="images" class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                    <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop Images</span>
+                    <div class="preview-grid hidden w-full grid-cols-4 gap-1 mt-1 relative z-20" id="reference-preview">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Character Images -->
+                <div class="field">
+                  <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Character (Max 6)</label>
+                  <div
+                    class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer"
+                    id="drop-character">
+                    <input type="file" id="character-images" accept="image/*" multiple
+                      class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                    <i data-lucide="users" class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                    <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop Images</span>
+                    <div class="preview-grid hidden w-full grid-cols-3 gap-1 mt-1 relative z-20" id="character-preview">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <!-- Scene -->
+                  <div class="field">
+                    <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Scene </label>
+                    <div
+                      class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer aspect-square"
+                      id="drop-scene">
+                      <input type="file" id="scene-image" accept="image/*"
+                        class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                      <i data-lucide="image" class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                      <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop</span>
+                      <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                        id="scene-preview">
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Style -->
+                  <div class="field">
+                    <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Style </label>
+                    <div
+                      class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer aspect-square"
+                      id="drop-style">
+                      <input type="file" id="style-image" accept="image/*"
+                        class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                      <i data-lucide="palette"
+                        class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                      <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop</span>
+                      <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                        id="style-preview">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="h-px w-full bg-white/5"></div>
+
+              <!-- Tags Compact -->
+              <div class="field">
+                <label class="text-[10px] font-mono text-gray-500 uppercase mb-2 block">Style Tags</label>
+                <div class="flex flex-wrap gap-1.5" id="style-tags">
+                  <label class="chip cursor-pointer select-none">
+                    <input type="checkbox" value="cinematic lighting" class="hidden peer">
+                    <span
+                      class="px-2 py-0.5 border border-white/10 rounded-full text-[10px] text-gray-400 peer-checked:bg-white peer-checked:text-black peer-checked:border-white transition-all hover:border-white/40">Cinematic</span>
+                  </label>
+                  <label class="chip cursor-pointer select-none">
+                    <input type="checkbox" value="soft grain" class="hidden peer">
+                    <span
+                      class="px-2 py-0.5 border border-white/10 rounded-full text-[10px] text-gray-400 peer-checked:bg-white peer-checked:text-black peer-checked:border-white transition-all hover:border-white/40">Grain</span>
+                  </label>
+                  <label class="chip cursor-pointer select-none">
+                    <input type="checkbox" value="ultra detailed" class="hidden peer">
+                    <span
+                      class="px-2 py-0.5 border border-white/10 rounded-full text-[10px] text-gray-400 peer-checked:bg-white peer-checked:text-black peer-checked:border-white transition-all hover:border-white/40">Detailed</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-2">
+                <select id="palette"
+                  class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] focus:outline-none text-gray-400">
+                  <option value="">Palette...</option>
+                  <option value="ember and teal">Ember/Teal</option>
+                  <option value="sunset clay">Sunset</option>
+                  <option value="cobalt and cream">Cobalt</option>
+                </select>
+                <select id="mood"
+                  class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] focus:outline-none text-gray-400">
+                  <option value="">Mood...</option>
+                  <option value="moody">Moody</option>
+                  <option value="bright">Bright</option>
+                  <option value="minimal">Minimal</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="tab-panel hidden" data-feature-panel="recreate">
+              <div class="flex flex-col gap-3">
+                <div class="field">
+                  <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Reference Image</label>
+                  <div
+                    class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 min-h-[140px] flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer"
+                    id="drop-recreate-reference">
+                    <input type="file" id="recreate-reference" accept="image/*"
+                      class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                    <i data-lucide="scan" class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                    <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop Image</span>
+                    <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                      id="recreate-reference-preview"></div>
+                  </div>
+                </div>
+
+                <button
+                  class="w-full px-4 py-2 border border-white/15 rounded-xl text-[11px] font-mono uppercase tracking-widest text-gray-300 hover:bg-white hover:text-black transition-colors"
+                  type="button" id="recreate-analyze">
+                  Analyze Image
+                </button>
+
+                <div id="recreate-status" class="text-[10px] font-mono text-gray-500 h-4"></div>
+
+                <div class="field">
+                  <label for="recreate-model-select"
+                    class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Model</label>
+                  <select id="recreate-model-select"
+                    class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] focus:outline-none text-gray-300 appearance-none">
+                    <option value="google/gemini-3.1-flash-image-preview">Nano Banana 2</option>
+                    <option value="google/gemini-3-pro-image-preview">Nano Banana Pro</option>
+                    <option value="google/gemini-2.5-flash-image">Nano Banana</option>
+                    <option value="openai/gpt-5-image">GPT-5 Image</option>
+                    <option value="openai/gpt-5-image-mini">GPT-5 Mini</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Global Edits</label>
+                  <textarea id="recreate-notes" rows="3" placeholder="Optional global changes..."
+                    class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[11px] focus:outline-none text-gray-300 resize-none"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-panel hidden" data-feature-panel="product">
+              <div class="flex flex-col gap-4">
+                <div class="field">
+                  <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Product Reference (1
+                    Image)</label>
+                  <div
+                    class="drop-zone relative border border-dashed text-blue-400 border-blue-400/30 rounded-xl bg-blue-500/5 hover:bg-blue-500/10 transition-colors p-4 flex flex-col items-center justify-center gap-2 text-center group cursor-pointer aspect-video"
+                    id="drop-product-reference">
+                    <input type="file" id="product-reference" accept="image/*"
+                      class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                    <i data-lucide="scan-line"
+                      class="w-6 h-6 text-blue-500/70 group-hover:text-blue-400 transition-colors"></i>
+                    <span class="text-[10px] text-blue-500/70 group-hover:text-blue-400 font-mono tracking-wide">Drop
+                      Product Image</span>
+                    <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                      id="product-reference-preview"></div>
+                  </div>
+                </div>
+                <button id="product-analyze" type="button" disabled
+                  class="w-full py-3 rounded-xl bg-blue-500 text-white text-[10px] font-mono uppercase tracking-widest hover:bg-blue-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  <i data-lucide="wand-2" class="w-4 h-4"></i> Generate Concept Pairs
+                </button>
+                <div id="product-suggestions-container" class="hidden flex-col gap-2 mt-2">
+                  <p
+                    class="text-[10px] text-gray-400 font-mono mb-1 uppercase tracking-widest border-b border-white/10 pb-1">
+                    AI Suggested Start & End Frames</p>
+                  <div id="product-suggestions"
+                    class="flex flex-col gap-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="h-px w-full bg-white/5"></div>
+
+            <!-- Output Settings -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="field">
+                <label for="aspect" class="text-[10px] font-mono text-gray-500 uppercase mb-1 block">Aspect</label>
+                <select id="aspect"
+                  class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] focus:outline-none text-gray-300 appearance-none">
+                  <option value="1:1">1:1 Square</option>
+                  <option value="16:9">16:9 Wide</option>
+                  <option value="9:16">9:16 Tall</option>
+                  <option value="reference">Reference</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="count" class="text-[10px] font-mono text-gray-500 uppercase mb-1 block">Count: <span
+                    id="count-value">1</span></label>
+                <input type="range" id="count" min="1" max="4" value="1"
+                  class="w-full accent-white h-1 bg-white/20 rounded-lg appearance-none cursor-pointer mt-2">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="seed" class="text-[10px] font-mono text-gray-500 uppercase mb-1 block">Seed</label>
+              <input id="seed" type="number" placeholder="Seed..."
+                class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] focus:outline-none placeholder-gray-600 text-gray-300">
+            </div>
+
+            <div class="error text-red-400 text-[10px] font-mono h-4 truncate" id="error"></div>
+          </form>
+        </section>
+      </div>
+
+      <!-- Right Sidebar: Gallery (Col Span 9) -->
+      <div class="lg:col-span-9 flex flex-col h-full">
+        <section id="recreate-editor"
+          class="hidden glass-panel p-5 rounded-2xl border border-white/10 bg-[#0A0A0A]/80 backdrop-blur-xl mb-6">
+          <div class="flex justify-between items-end border-b border-white/5 pb-4 mb-4">
+            <div>
+              <h2 class="text-xl font-light">Recreate Editor</h2>
+              <p id="recreate-summary" class="text-xs font-mono text-gray-500 mt-2">
+                Analyze a reference image to list every element.
+              </p>
+            </div>
+            <div class="text-xs font-mono text-gray-500">
+              <span id="recreate-elements-count" class="text-white">0</span> elements
+            </div>
+          </div>
+          <div id="recreate-elements" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+          <div class="flex items-center gap-3 mt-5">
+            <button id="recreate-run" type="button"
+              class="px-5 py-2 rounded-full bg-white text-black text-xs font-mono uppercase tracking-widest hover:bg-gray-200 transition-colors">
+              Recreate Image
+            </button>
+          </div>
+        </section>
+
+        <section class="gallery min-h-[600px] flex flex-col">
+          <div class="flex justify-between items-end mb-6 border-b border-white/5 pb-4">
+            <div>
+              <h2 id="gallery-title" class="text-xl font-light">Gallery</h2>
+            </div>
+            <div class="text-xs font-mono text-gray-500">
+              <span id="image-count" class="text-white">0</span> results
+            </div>
+          </div>
+
+          <div class="gallery-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="gallery-grid"></div>
+
+          <div
+            class="gallery-empty border border-dashed border-white/10 rounded-2xl p-12 text-center bg-white/5 flex flex-col items-center justify-center h-96"
+            id="gallery-empty">
+            <i data-lucide="aperture" class="w-12 h-12 text-gray-700 mb-4"></i>
+            <p id="gallery-empty-text" class="text-gray-500 mb-6 max-w-sm">Results will appear here. Try a sample
+              prompt to get started.</p>
+            <div class="flex flex-wrap justify-center gap-3">
+              <button
+                class="sample px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 hover:bg-white hover:text-black transition-colors"
+                type="button" data-prompt="A neon-lit sushi bar, cinematic lighting, soft grain">
+                Neon sushi bar
+              </button>
+              <button
+                class="sample px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 hover:bg-white hover:text-black transition-colors"
+                type="button" data-prompt="A brutalist greenhouse in winter fog, wide angle">
+                Brutalist greenhouse
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <!-- Image Editor Modal -->
+  <div id="editor-modal" class="editor-modal hidden" aria-hidden="true">
+    <div class="editor-backdrop" data-editor-close></div>
+    <div class="editor-panel" role="dialog" aria-modal="true" aria-label="Image editor">
+      <div class="editor-toolbar">
+        <div class="editor-color-pill" role="listbox" aria-label="Brush colors">
+          <button class="editor-color-btn active" type="button" data-color="#ff4d4d" aria-label="Red"></button>
+          <button class="editor-color-btn" type="button" data-color="#f7c948" aria-label="Yellow"></button>
+          <button class="editor-color-btn" type="button" data-color="#34d399" aria-label="Green"></button>
+          <button class="editor-color-btn" type="button" data-color="#60a5fa" aria-label="Blue"></button>
+          <button class="editor-color-btn" type="button" data-color="#ffffff" aria-label="White"></button>
+        </div>
+        <div class="editor-size-pill" role="group" aria-label="Brush size">
+          <input id="editor-brush-size" type="range" min="2" max="30" value="6" aria-label="Brush size">
+          <span id="editor-brush-label">6</span>
+        </div>
+        <div class="editor-tool-pill" role="group" aria-label="Tools">
+          <button id="tool-draw" class="editor-tool active" type="button" data-tool="draw" aria-label="Draw tool">
+            <i data-lucide="pencil" class="w-4 h-4"></i>
+          </button>
+          <button id="tool-text" class="editor-tool" type="button" data-tool="text" aria-label="Text tool">T</button>
+        </div>
+      </div>
+      <div class="editor-canvas-wrap">
+        <div id="editor-loading" class="editor-loading hidden">Loading image...</div>
+        <canvas id="editor-canvas"></canvas>
+        <input id="editor-text-input" class="editor-text-input hidden" type="text" placeholder="Type and press Enter">
+      </div>
+      <div class="editor-actions">
+        <button id="editor-reset" type="button">Reset</button>
+        <div class="editor-action-spacer"></div>
+        <button id="editor-cancel" type="button">Cancel</button>
+        <button id="editor-save" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Input Bar (Centered Bottom) -->
+  <div id="generate-bar" class="fixed bottom-0 left-0 w-full z-40 p-4 sm:p-6 pointer-events-none">
+    <div class="max-w-3xl mx-auto pointer-events-auto">
+      <div
+        class="glass-panel p-2 rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+
+        <!-- Custom Model Select (Upward Dropdown) -->
+        <div class="relative shrink-0" id="custom-model-wrapper">
+          <select id="model-select" form="generator-form" class="hidden">
+            <option value="google/gemini-3.1-flash-image-preview">Nano Banana 2</option>
+            <option value="google/gemini-3-pro-image-preview">Nano Banana Pro</option>
+            <option value="google/gemini-2.5-flash-image">Nano Banana</option>
+            <option value="openai/gpt-5-image">GPT-5 Image</option>
+            <option value="openai/gpt-5-image-mini">GPT-5 Mini</option>
+          </select>
+
+          <button type="button" id="model-select-trigger"
+            class="w-full sm:w-auto flex items-center justify-between gap-3 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 text-[10px] rounded-lg px-4 py-3 focus:outline-none transition-colors cursor-pointer font-mono uppercase tracking-wide">
+            <span id="model-select-label">Nano Banana 2</span>
+            <i data-lucide="chevron-up" class="w-3 h-3 text-gray-500 transition-transform duration-200"
+              id="model-select-icon"></i>
+          </button>
+
+          <div id="model-select-menu"
+            class="absolute bottom-full left-0 mb-2 w-full sm:w-48 bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl py-1 hidden flex-col z-50 overflow-hidden transform origin-bottom backdrop-blur-xl">
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="google/gemini-3.1-flash-image-preview">Nano Banana 2</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="google/gemini-3-pro-image-preview">Nano Banana Pro</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="google/gemini-2.5-flash-image">Nano Banana</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="openai/gpt-5-image">GPT-5 Image</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="openai/gpt-5-image-mini">GPT-5 Mini</button>
+          </div>
+        </div>
+
+        <div class="flex items-end sm:items-center gap-2 sm:gap-3 flex-1 relative">
+          <!-- Prompt Input -->
+          <div class="flex-1 relative flex flex-col">
+            <textarea id="prompt" form="generator-form" rows="1" placeholder="Describe your image..."
+              class="w-full bg-transparent border-0 px-2 pt-3 pb-1 focus:ring-0 text-sm font-sans placeholder-gray-500 text-white resize-none leading-relaxed max-h-32 overflow-y-auto custom-scrollbar"
+              oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 128) + 'px'"></textarea>
+            <div class="px-2 pb-2">
+              <button type="button" id="surprise-btn"
+                class="text-[10px] text-gray-500 hover:text-blue-400 transition-colors flex items-center gap-1 pl-1">
+                <i data-lucide="sparkles" class="w-3 h-3"></i> Recommendation: Surprise me
+              </button>
+            </div>
+          </div>
+
+          <!-- Generate Button -->
+          <button form="generator-form" type="submit" id="generate"
+            class="shrink-0 bg-white text-black hover:bg-gray-200 p-3 rounded-xl transition-transform active:scale-95 shadow-lg shadow-white/5 hover-trigger flex items-center justify-center"
+            data-cursor="link">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="app.js"></script>
+
+  <!-- Shared UI Logics -->
+  <script>
+    // Init Icons
+    lucide.createIcons();
+
+    // Smooth Scroll
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      direction: 'vertical',
+      gestureDirection: 'vertical',
+      smooth: true,
+      mouseMultiplier: 1,
+      smoothTouch: false,
+      touchMultiplier: 2,
+    });
+
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    // Cursor Logic
+    const cursorDot = document.querySelector('.cursor-dot');
+    const cursorOutline = document.querySelector('.cursor-outline');
+    const hoverTriggers = document.querySelectorAll('.hover-trigger');
+
+    window.addEventListener('mousemove', (e) => {
+      const posX = e.clientX;
+      const posY = e.clientY;
+
+      // Dot follows instantly
+      cursorDot.style.left = `${posX}px`;
+      cursorDot.style.top = `${posY}px`;
+
+      // Outline follows with slight delay
+      gsap.to(cursorOutline, {
+        x: posX,
+        y: posY,
+        duration: 0.15,
+        ease: "power2.out"
+      });
+    });
+
+    // Add event listeners for new elements dynamically if needed, 
+    // but for now we attach to existing static ones
+    document.querySelectorAll('.hover-trigger, button, a, input, textarea, label.chip, .drop-zone').forEach(trigger => {
+      trigger.addEventListener('mouseenter', () => {
+        document.body.classList.add('hovering');
+        cursorOutline.style.borderColor = 'transparent';
+        cursorOutline.style.backgroundColor = 'rgba(255,255,255,0.2)';
+      });
+      trigger.addEventListener('mouseleave', () => {
+        document.body.classList.remove('hovering');
+        cursorOutline.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+        cursorOutline.style.backgroundColor = 'transparent';
+      });
+    });
+
+    // Mobile Menu
+    const menuBtn = document.getElementById('menu-btn');
+    const closeBtn = document.getElementById('close-menu');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    if (menuBtn) {
+      menuBtn.addEventListener('click', () => {
+        mobileMenu.classList.remove('translate-x-full');
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        mobileMenu.classList.add('translate-x-full');
+      });
+    }
+
+    // Progress Bar
+    window.addEventListener('scroll', () => {
+      const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+      const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      const scrolled = (winScroll / height) * 100;
+      document.querySelector(".progress-bar").style.width = scrolled + "%";
+    });
+
+    // Form Animation on Load
+    gsap.from(".glass-panel", {
+      y: 50,
+      opacity: 0,
+      duration: 1,
+      ease: "power3.out",
+      delay: 0.2
+    });
+
+  </script>
+
+  <!-- Additional Styles Override -->
+  <style>
+    /* Custom Styles for Futuristic Feel */
+    body {
+      cursor: none;
+    }
+
+    .cursor-dot,
+    .cursor-outline {
+      position: fixed;
+      top: 0;
+      left: 0;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .cursor-dot {
+      width: 8px;
+      height: 8px;
+      background-color: white;
+    }
+
+    .cursor-outline {
+      width: 40px;
+      height: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      transition: width 0.2s, height 0.2s, background-color 0.2s;
+    }
+
+    /* Hover States for Cursor */
+    body.hovering .cursor-outline {
+      width: 60px;
+      height: 60px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-color: transparent;
+    }
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .noise-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9000;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    .grid-bg {
+      background-size: 40px 40px;
+      mask-image: radial-gradient(circle at center, black, transparent 80%);
+      -webkit-mask-image: radial-gradient(circle at center, black, transparent 80%);
+    }
+
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: white;
+      width: 0%;
+      z-index: 10000;
+    }
+
+    /* Drag & Drop Styles */
+    .drop-zone.drag-over {
+      border-color: white;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .preview-single img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Custom Scrollbar for Sidebar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+  </style>
+</body>
+
+</html>

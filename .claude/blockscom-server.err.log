@@ -1,0 +1,1 @@
+SECURITY WARNING: FB_APP_SECRET is not set. Webhook signature verification is DISABLED. Set FB_APP_SECRET in your environment variables for production.

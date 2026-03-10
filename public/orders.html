@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BLOCKSCOM | Orders</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -13,7 +14,9 @@
             --bg: #09090b;
             --surface: #121216;
             --surface-elevated: #1c1c21;
+            --surface-glass: rgba(18, 18, 22, 0.82);
             --border: #27272a;
+            --border-strong: rgba(255, 255, 255, 0.18);
             --primary: #ffffff;
             --accent: #3f3f46;
             --success: #22c55e;
@@ -22,6 +25,7 @@
             --text: #fafafa;
             --text-muted: #a1a1aa;
             --text-dim: #71717a;
+            --shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.42);
         }
 
         * {
@@ -31,32 +35,63 @@
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
             display: flex;
+            position: relative;
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(circle at 15% 18%, rgba(255, 255, 255, 0.06), transparent 24%),
+                radial-gradient(circle at 82% 12%, rgba(255, 255, 255, 0.04), transparent 22%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+            background-size: auto, auto, 40px 40px, 40px 40px;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.04;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.035), transparent 55%);
         }
 
         .sidebar {
-            width: 280px;
-            border-right: 1px solid var(--border);
-            padding: 32px 24px;
+            width: 296px;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 28px 22px;
             display: flex;
             flex-direction: column;
             position: fixed;
             height: 100vh;
-            background: var(--bg);
+            background: rgba(9, 9, 11, 0.82);
+            backdrop-filter: blur(18px);
             z-index: 50;
             transition: transform 0.3s ease;
+            overflow-y: auto;
         }
 
         .main {
             flex: 1;
-            margin-left: 280px;
-            padding: 48px;
-            max-width: 1300px;
+            margin-left: 296px;
+            padding: 40px 40px 56px;
+            max-width: none;
             width: 100%;
+            position: relative;
+            z-index: 1;
         }
 
         @media (max-width: 900px) {
@@ -75,11 +110,13 @@
         }
 
         .logo {
-            font-weight: 800;
-            font-size: 1.25rem;
+            font-family: 'Space Grotesk', monospace;
+            font-weight: 700;
+            font-size: 1.18rem;
             margin-bottom: 48px;
-            letter-spacing: -0.5px;
+            letter-spacing: 0.08em;
             cursor: pointer;
+            text-transform: uppercase;
         }
 
         .logo span {
@@ -88,10 +125,10 @@
         }
 
         h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            margin-bottom: 24px;
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: -0.04em;
+            margin-bottom: 0;
         }
 
         .nav-group {
@@ -99,49 +136,61 @@
         }
 
         .nav-label {
-            font-size: 0.7rem;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.68rem;
             font-weight: 700;
             color: var(--text-dim);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
-            padding-left: 12px;
+            letter-spacing: 0.18em;
+            margin-bottom: 10px;
+            padding-left: 10px;
         }
 
         .nav-item {
-            padding: 12px 16px;
-            border-radius: 10px;
+            padding: 12px 14px;
+            border-radius: 999px;
             color: var(--text-muted);
             cursor: pointer;
-            transition: 0.2s;
-            font-size: 0.9rem;
-            margin-bottom: 4px;
+            transition: all 0.2s ease;
+            font-size: 0.82rem;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             gap: 12px;
             text-decoration: none;
+            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.02);
+            font-family: 'Space Grotesk', monospace;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
         .nav-item:hover {
-            background: var(--surface);
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.14);
             color: var(--text);
+            transform: translateX(2px);
         }
 
         .nav-item.active {
-            background: var(--surface-elevated);
-            color: var(--primary);
-            font-weight: 600;
+            background: var(--primary);
+            color: #050505;
+            font-weight: 700;
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.08);
         }
 
         .user-card {
             margin-top: auto;
-            padding: 16px;
-            background: linear-gradient(145deg, var(--surface), var(--surface-elevated));
-            border: 1px solid var(--border);
-            border-radius: 16px;
+            padding: 18px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 22px;
             display: flex;
             flex-direction: column;
             gap: 16px;
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(18px);
         }
 
         .user-profile-row {
@@ -153,13 +202,13 @@
         .user-avatar {
             width: 40px;
             height: 40px;
-            border-radius: 12px;
-            background: var(--bg);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--text-muted);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             flex-shrink: 0;
         }
 
@@ -180,29 +229,32 @@
         }
 
         .user-tier {
-            font-size: 0.65rem;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.62rem;
             font-weight: 800;
             color: var(--primary);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.16em;
             margin-top: 2px;
         }
 
         .user-credits-container {
-            background: var(--bg);
-            border-radius: 10px;
-            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 12px 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid var(--border);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .credits-label {
-            font-size: 0.7rem;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.65rem;
             font-weight: 600;
             color: var(--text-dim);
             text-transform: uppercase;
+            letter-spacing: 0.16em;
         }
 
         .credits-amount {
@@ -214,18 +266,21 @@
         .btn-logout {
             width: 100%;
             background: transparent;
-            border: 1px dashed var(--border);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             color: var(--text-muted);
-            padding: 10px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            font-weight: 600;
+            padding: 12px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            transition: 0.2s;
+            transition: all 0.2s ease;
+            font-family: 'Space Grotesk', monospace;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
         }
 
         .btn-logout:hover {
@@ -235,35 +290,41 @@
         }
 
         .btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 600;
+            padding: 12px 18px;
+            border-radius: 999px;
+            font-weight: 700;
             cursor: pointer;
-            border: none;
-            font-size: 0.75rem;
-            transition: 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.72rem;
+            transition: all 0.2s ease;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             text-decoration: none;
+            font-family: 'Space Grotesk', monospace;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
         }
 
         .btn-secondary {
-            background: var(--surface-elevated);
+            background: rgba(255, 255, 255, 0.04);
             color: var(--text);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .btn-secondary:hover {
-            background: var(--accent);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
         }
 
         .table-responsive {
             width: 100%;
             overflow-x: auto;
-            background: var(--surface);
-            border-radius: 20px;
-            border: 1px solid var(--border);
+            background: var(--surface-glass);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(18px);
         }
 
         table {
@@ -384,17 +445,117 @@
             left: 0;
             right: 0;
             height: 60px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
+            background: rgba(9, 9, 11, 0.86);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(16px);
             z-index: 40;
             padding: 0 24px;
             align-items: center;
             justify-content: space-between;
         }
 
+        .header {
+            margin-bottom: 28px;
+        }
+
+        .header p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-top: 6px;
+        }
+
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            margin-bottom: 28px;
+            padding: 22px 24px;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025)),
+                rgba(18, 18, 22, 0.78);
+            backdrop-filter: blur(20px);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .app-shell-label {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            margin-bottom: 8px;
+        }
+
+        .app-shell-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .app-shell-copy p {
+            color: var(--text-dim);
+            font-size: 0.92rem;
+            line-height: 1.6;
+            margin-top: 6px;
+            max-width: 780px;
+        }
+
+        .app-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .app-tab {
+            padding: 11px 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            font-family: 'Space Grotesk', monospace;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .app-tab:hover {
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.22);
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .app-tab.active {
+            background: var(--primary);
+            color: #050505;
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.08);
+        }
+
         @media (max-width: 900px) {
             .mobile-header {
                 display: flex;
+            }
+
+            .app-shell {
+                padding: 18px;
+                border-radius: 22px;
+            }
+
+            .app-shell-head {
+                flex-direction: column;
             }
         }
 
@@ -490,18 +651,20 @@
         <div class="logo" onclick="window.location.href='/dashboard'">BLOCKSCOM<span>●</span></div>
 
         <div class="nav-group">
-            <div class="nav-label">Main</div>
-            <a href="/dashboard" class="nav-item">Dashboard</a>
-            <a href="/dashboard" class="nav-item">Knowledge Base</a>
-            <a href="/dashboard" class="nav-item">Inventory System</a>
-            <a href="/dashboard" class="nav-item">Live Activity</a>
-            <a href="/orders.html" class="nav-item active">Orders</a>
+            <div class="nav-label">Facebook Automation</div>
+            <a href="/dashboard" class="nav-item active">Facebook Automation</a>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-label">Image &amp; Video Generation</div>
+            <a href="/dashboard?view=studio" class="nav-item">Image and Video Generation</a>
         </div>
 
         <div class="nav-group">
             <div class="nav-label">Settings</div>
             <a href="/dashboard?view=settings" class="nav-item">Platform Settings</a>
             <a href="/dashboard?view=admin" id="admin-nav" class="nav-item" style="display:none">Admin Controls</a>
+            <a href="/dashboard?view=admin-logs" id="admin-logs-nav" class="nav-item" style="display:none">Admin Logs</a>
         </div>
 
         <div class="user-card">
@@ -547,10 +710,29 @@
     </div>
 
     <main class="main">
+        <div class="app-shell">
+            <div class="app-shell-head">
+                <div class="app-shell-copy">
+                    <div class="app-shell-label">App Workspace</div>
+                    <h2>Facebook Automation</h2>
+                    <p>Manage automations, knowledge, inventory, media assets, live activity, and orders from one shared workspace.</p>
+                </div>
+            </div>
+            <div class="app-tabs">
+                <a href="/dashboard" class="app-tab">Dashboard</a>
+                <a href="/dashboard?view=kb" class="app-tab">Knowledge Base</a>
+                <a href="/dashboard?view=products" class="app-tab">Inventory System</a>
+                <a href="/dashboard?view=images" class="app-tab">Images</a>
+                <a href="/dashboard?view=logs" class="app-tab">Live Activity</a>
+                <a href="/orders.html" class="app-tab active">Orders</a>
+            </div>
+        </div>
+
         <div class="header">
-            <h1>AI Customer Orders</h1>
-            <p style="color:var(--text-dim); font-size:0.9rem; margin-top:-16px; margin-bottom:32px;">Manage system
-                orders placed seamlessly by your AI assistant.</p>
+            <div>
+                <h1>AI Customer Orders</h1>
+                <p>Manage system orders placed seamlessly by your AI assistant.</p>
+            </div>
         </div>
 
         <div class="table-responsive">
@@ -581,6 +763,20 @@
         let currentSession = null;
         const CURRENCY_SYMBOLS = { USD: '$', PHP: '₱', EUR: '€', GBP: '£', JPY: '¥' };
         let userCurrency = 'PHP';
+        function normalizeRole(role) {
+            return String(role || 'user').trim().toLowerCase();
+        }
+
+        function isAdminRole(role) {
+            return normalizeRole(role) === 'admin';
+        }
+
+        function getPlanRole(role) {
+            const normalized = normalizeRole(role);
+            if (normalized === 'admin') return 'ADMIN';
+            if (normalized === 'manager') return 'PREMIUM';
+            return 'FREE';
+        }
         let currencySymbol = '₱';
 
         async function init() {
@@ -596,14 +792,17 @@
             if (cachedMeStr) {
                 try {
                     const cachedMe = JSON.parse(cachedMeStr);
-                    if (cachedMe.role === 'FREE') {
+                    if (getPlanRole(cachedMe.role) === 'FREE') {
                         alert('Order Page taking features are only available for Premium Members. Free members can only use Auto reply features.');
                         window.location.href = '/dashboard';
                         return;
                     }
-                    document.getElementById('u-tier').innerText = `${cachedMe.role} TIER`;
+                    document.getElementById('u-tier').innerText = `${getPlanRole(cachedMe.role)} TIER`;
                     document.getElementById('u-credits').innerText = `${(cachedMe.credits || 0).toLocaleString()} Credits`;
-                    if (cachedMe.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+                    if (isAdminRole(cachedMe.role)) {
+                        document.getElementById('admin-nav').style.display = 'flex';
+                        document.getElementById('admin-logs-nav').style.display = 'flex';
+                    }
                     if (cachedMe.currency) {
                         userCurrency = cachedMe.currency;
                         currencySymbol = CURRENCY_SYMBOLS[userCurrency] || userCurrency;
@@ -619,16 +818,19 @@
                     const me = await res.json();
                     localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
 
-                    if (me.role === 'FREE') {
+                    if (getPlanRole(me.role) === 'FREE') {
                         alert('Order Page taking features are only available for Premium Members. Free members can only use Auto reply features.');
                         window.location.href = '/dashboard';
                         return;
                     }
 
                     document.getElementById('u-email').innerText = me.email;
-                    document.getElementById('u-tier').innerText = `${me.role} TIER`;
+                    document.getElementById('u-tier').innerText = `${getPlanRole(me.role)} TIER`;
                     document.getElementById('u-credits').innerText = `${(me.credits || 0).toLocaleString()} Credits`;
-                    if (me.role === 'ADMIN') document.getElementById('admin-nav').style.display = 'flex';
+                    if (isAdminRole(me.role)) {
+                        document.getElementById('admin-nav').style.display = 'flex';
+                        document.getElementById('admin-logs-nav').style.display = 'flex';
+                    }
 
                     if (me.currency && me.currency !== userCurrency) {
                         userCurrency = me.currency;

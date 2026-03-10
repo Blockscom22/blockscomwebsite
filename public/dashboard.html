@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BLOCKSCOM | Premium AI SAAS</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -15,7 +16,9 @@
       --bg: #09090b;
       --surface: #121216;
       --surface-elevated: #1c1c21;
+      --surface-glass: rgba(18, 18, 22, 0.82);
       --border: #27272a;
+      --border-strong: rgba(255, 255, 255, 0.18);
       --primary: #ffffff;
       --accent: #3f3f46;
       --success: #22c55e;
@@ -24,6 +27,7 @@
       --text: #fafafa;
       --text-muted: #a1a1aa;
       --text-dim: #71717a;
+      --shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.42);
     }
 
     * {
@@ -33,33 +37,63 @@
     }
 
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-family: 'Inter', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
+      position: relative;
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(circle at 15% 18%, rgba(255, 255, 255, 0.06), transparent 24%),
+        radial-gradient(circle at 82% 12%, rgba(255, 255, 255, 0.04), transparent 22%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: auto, auto, 40px 40px, 40px 40px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.035), transparent 55%);
     }
 
     /* Layout */
     .sidebar {
-      width: 280px;
-      border-right: 1px solid var(--border);
-      padding: 32px 24px;
+      width: 296px;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 28px 22px;
       display: flex;
       flex-direction: column;
       position: fixed;
       height: 100vh;
-      background: var(--bg);
+      background: rgba(9, 9, 11, 0.82);
+      backdrop-filter: blur(18px);
       z-index: 50;
       transition: transform 0.3s ease;
     }
 
     .main {
       flex: 1;
-      margin-left: 280px;
-      padding: 48px;
-      max-width: 1300px;
+      margin-left: 296px;
+      padding: 40px 40px 56px;
+      max-width: none;
       width: 100%;
+      position: relative;
+      z-index: 1;
     }
 
     /* Mobile Layout Overrides */
@@ -81,10 +115,12 @@
 
     /* Typography */
     .logo {
-      font-weight: 800;
-      font-size: 1.25rem;
+      font-family: 'Space Grotesk', monospace;
+      font-weight: 700;
+      font-size: 1.18rem;
       margin-bottom: 48px;
-      letter-spacing: -0.5px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .logo span {
@@ -93,14 +129,14 @@
     }
 
     h1 {
-      font-size: 1.75rem;
-      font-weight: 700;
-      letter-spacing: -0.5px;
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.04em;
     }
 
     h2 {
-      font-size: 1.25rem;
-      font-weight: 600;
+      font-size: 1.18rem;
+      font-weight: 500;
     }
 
     h3 {
@@ -117,48 +153,61 @@
     }
 
     .nav-label {
-      font-size: 0.7rem;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.68rem;
       font-weight: 700;
       color: var(--text-dim);
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-      padding-left: 12px;
+      letter-spacing: 0.18em;
+      margin-bottom: 10px;
+      padding-left: 10px;
     }
 
     .nav-item {
-      padding: 12px 16px;
-      border-radius: 10px;
+      padding: 12px 14px;
+      border-radius: 999px;
       color: var(--text-muted);
       cursor: pointer;
-      transition: 0.2s;
-      font-size: 0.9rem;
-      margin-bottom: 4px;
+      transition: all 0.2s ease;
+      font-size: 0.82rem;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       gap: 12px;
+      border: 1px solid transparent;
+      background: rgba(255, 255, 255, 0.02);
+      font-family: 'Space Grotesk', monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
 
     .nav-item:hover {
-      background: var(--surface);
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.14);
       color: var(--text);
+      transform: translateX(2px);
     }
 
     .nav-item.active {
-      background: var(--surface-elevated);
+      background: var(--primary);
       color: var(--primary);
-      font-weight: 600;
+      color: #050505;
+      border-color: var(--primary);
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.08);
     }
 
     .user-card {
       margin-top: auto;
-      padding: 16px;
-      background: linear-gradient(145deg, var(--surface), var(--surface-elevated));
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 22px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(18px);
     }
 
     .user-profile-row {
@@ -170,13 +219,13 @@
     .user-avatar {
       width: 40px;
       height: 40px;
-      border-radius: 12px;
-      background: var(--bg);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--text-muted);
-      border: 1px solid var(--border);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       flex-shrink: 0;
     }
 
@@ -197,29 +246,32 @@
     }
 
     .user-tier {
-      font-size: 0.65rem;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.62rem;
       font-weight: 800;
       color: var(--primary);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.16em;
       margin-top: 2px;
     }
 
     .user-credits-container {
-      background: var(--bg);
-      border-radius: 10px;
-      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 16px;
+      padding: 12px 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border: 1px solid var(--border);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .credits-label {
-      font-size: 0.7rem;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.65rem;
       font-weight: 600;
       color: var(--text-dim);
       text-transform: uppercase;
+      letter-spacing: 0.16em;
     }
 
     .credits-amount {
@@ -231,18 +283,21 @@
     .btn-logout {
       width: 100%;
       background: transparent;
-      border: 1px dashed var(--border);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       color: var(--text-muted);
-      padding: 10px;
-      border-radius: 10px;
-      font-size: 0.8rem;
-      font-weight: 600;
+      padding: 12px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      transition: 0.2s;
+      transition: all 0.2s ease;
+      font-family: 'Space Grotesk', monospace;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
     }
 
     .btn-logout:hover {
@@ -256,20 +311,107 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 40px;
+      margin-bottom: 28px;
+    }
+
+    .app-shell {
+      display: none;
+      flex-direction: column;
+      gap: 18px;
+      margin-bottom: 28px;
+      padding: 22px 24px;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025)),
+        rgba(18, 18, 22, 0.78);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .app-shell.active {
+      display: flex;
+    }
+
+    .app-shell-label {
+      font-family: 'Space Grotesk', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      margin-bottom: 8px;
+    }
+
+    .app-shell-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .app-shell-copy p {
+      color: var(--text-dim);
+      font-size: 0.92rem;
+      line-height: 1.6;
+      margin-top: 6px;
+      max-width: 780px;
+    }
+
+    .app-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .app-tab {
+      padding: 11px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      font-family: 'Space Grotesk', monospace;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .app-tab:hover {
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .app-tab.active {
+      background: var(--primary);
+      color: #050505;
+      border-color: var(--primary);
+      box-shadow: 0 10px 30px rgba(255, 255, 255, 0.08);
     }
 
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 28px;
-      transition: 0.2s;
+      background: var(--surface-glass);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 24px;
+      transition: all 0.25s ease;
       overflow: hidden;
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-soft);
     }
 
     .card:hover {
-      border-color: var(--accent);
+      border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-2px);
     }
 
     .grid {
@@ -279,17 +421,20 @@
     }
 
     .btn {
-      padding: 10px 20px;
-      border-radius: 10px;
-      font-weight: 600;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-weight: 700;
       cursor: pointer;
-      border: none;
-      font-size: 0.85rem;
-      transition: 0.2s;
+      border: 1px solid transparent;
+      font-size: 0.72rem;
+      transition: all 0.2s ease;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
+      font-family: 'Space Grotesk', monospace;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
     }
 
     .btn-primary {
@@ -298,18 +443,20 @@
     }
 
     .btn-primary:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
+      opacity: 0.96;
+      transform: translateY(-2px);
+      box-shadow: 0 14px 32px rgba(255, 255, 255, 0.12);
     }
 
     .btn-secondary {
-      background: var(--surface-elevated);
+      background: rgba(255, 255, 255, 0.04);
       color: var(--text);
-      border: 1px solid var(--border);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .btn-secondary:hover {
-      background: var(--accent);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
     }
 
     .btn-danger {
@@ -324,20 +471,23 @@
 
     .input {
       width: 100%;
-      padding: 14px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      padding: 14px 16px;
+      background: rgba(0, 0, 0, 0.34);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
       color: var(--text);
       margin-top: 8px;
       margin-bottom: 20px;
       font-size: 0.9rem;
-      transition: 0.2s;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(12px);
     }
 
     .input:focus {
       outline: none;
-      border-color: var(--text-dim);
+      border-color: rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
     }
 
     textarea.input {
@@ -487,9 +637,11 @@
     .table-responsive {
       width: 100%;
       overflow-x: auto;
-      background: var(--surface);
-      border-radius: 20px;
-      border: 1px solid var(--border);
+      background: var(--surface-glass);
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow-soft);
     }
 
     table {
@@ -528,12 +680,25 @@
       left: 0;
       right: 0;
       height: 60px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
+      background: rgba(9, 9, 11, 0.86);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
       z-index: 40;
       padding: 0 24px;
       align-items: center;
       justify-content: space-between;
+    }
+
+    #view-studio {
+      width: 100%;
+    }
+
+    #studio-iframe {
+      width: 100%;
+      min-height: 980px;
+      height: calc(100vh - 188px);
+      border-radius: 24px !important;
+      box-shadow: var(--shadow-soft);
     }
 
     .hamburger {
@@ -550,6 +715,15 @@
     @media (max-width: 900px) {
       .mobile-header {
         display: flex;
+      }
+
+      .app-shell {
+        padding: 18px;
+        border-radius: 22px;
+      }
+
+      .app-shell-head {
+        flex-direction: column;
       }
 
       .header {
@@ -706,13 +880,13 @@
     <div class="logo">BLOCKSCOM<span>●</span></div>
 
     <div class="nav-group">
-      <div class="nav-label">Main</div>
-      <div class="nav-item active" id="nav-pages" onclick="showView('pages')">Dashboard</div>
-      <div class="nav-item" id="nav-kb" onclick="showView('kb')">Knowledge Base</div>
-      <div class="nav-item" id="nav-products" onclick="showView('products')">Inventory System</div>
-      <div class="nav-item" id="nav-images" onclick="showView('images')">Images</div>
-      <div class="nav-item" id="nav-logs" onclick="showView('logs')">Live Activity</div>
-      <div class="nav-item" onclick="checkOrdersAccess()">Orders</div>
+      <div class="nav-label">Facebook Automation</div>
+      <div class="nav-item active" id="nav-automation" onclick="openAutomationApp()">Facebook Automation</div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Image & Video Generation</div>
+      <div class="nav-item" id="nav-studio" onclick="showView('studio')">Image and Video Generation</div>
     </div>
 
     <div class="nav-group">
@@ -767,6 +941,24 @@
   </div>
 
   <main class="main">
+    <div id="automation-shell" class="app-shell">
+      <div class="app-shell-head">
+        <div class="app-shell-copy">
+          <div class="app-shell-label">App Workspace</div>
+          <h2>Facebook Automation</h2>
+          <p>Manage automations, knowledge, inventory, media assets, live activity, and orders from one shared workspace.</p>
+        </div>
+      </div>
+      <div class="app-tabs">
+        <button type="button" class="app-tab" data-automation-view="pages" onclick="showView('pages')">Dashboard</button>
+        <button type="button" class="app-tab" data-automation-view="kb" onclick="showView('kb')">Knowledge Base</button>
+        <button type="button" class="app-tab" data-automation-view="products" onclick="showView('products')">Inventory System</button>
+        <button type="button" class="app-tab" data-automation-view="images" onclick="showView('images')">Images</button>
+        <button type="button" class="app-tab" data-automation-view="logs" onclick="showView('logs')">Live Activity</button>
+        <button type="button" class="app-tab" onclick="checkOrdersAccess()">Orders</button>
+      </div>
+    </div>
+
     <!-- View: Pages -->
     <div id="view-pages" class="view-section">
       <div class="header">
@@ -915,6 +1107,17 @@
         </div>
         <div id="trigger-photos-list"></div>
       </div>
+    </div>
+
+    <!-- View: Image & Video Generation -->
+    <div id="view-studio" class="view-section" style="display:none">
+      <div class="header">
+        <h1>Image and Video Generation</h1>
+        <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Shared Blockscom login and credits for AI image and video generation</p>
+      </div>
+      <iframe id="studio-iframe" src="/studio/index.html"
+        style="width:100%; height:calc(100vh - 180px); border:none; border-radius:16px; background:var(--surface);"
+        allow="clipboard-write" loading="lazy"></iframe>
     </div>
 
     <!-- View: Activity Logs -->
@@ -1337,10 +1540,9 @@
           <div>
             <label>System Role</label>
             <select id="admin-um-role" class="input">
-              <option value="FREE">FREE</option>
-              <option value="PREMIUM">PREMIUM</option>
-              <option value="ENTERPRISE">ENTERPRISE</option>
-              <option value="ADMIN">ADMIN</option>
+              <option value="user">USER</option>
+              <option value="manager">MANAGER</option>
+              <option value="admin">ADMIN</option>
             </select>
           </div>
           <div>
@@ -1462,6 +1664,69 @@
     let exchangeRates = { USD: 1, PHP: 1 };
     let displayCurrency = 'PHP'; // Target Default Fixed
 
+    function normalizeRole(role) {
+      return String(role || 'user').trim().toLowerCase();
+    }
+
+    function isAdminRole(role) {
+      return normalizeRole(role) === 'admin';
+    }
+
+    function getPlanRole(role) {
+      const normalized = normalizeRole(role);
+      if (normalized === 'admin') return 'ADMIN';
+      if (normalized === 'manager') return 'PREMIUM';
+      return 'FREE';
+    }
+
+    function applyUserProfile(profile) {
+      if (!profile) return;
+
+      let existingProfile = me || {};
+      if (!me) {
+        try {
+          existingProfile = JSON.parse(localStorage.getItem('blockscom_user_profile') || '{}');
+        } catch (e) {
+          existingProfile = {};
+        }
+      }
+
+      me = { ...existingProfile, ...profile };
+      localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
+
+      if (me.email) {
+        document.getElementById('u-email').innerText = me.email;
+      }
+      if (me.role) {
+        document.getElementById('u-tier').innerText = `TIER: ${getPlanRole(me.role)}`;
+      }
+      document.getElementById('u-credits').innerText = `Credits: ${(me.credits || 0).toLocaleString()}`;
+
+      const isAdmin = isAdminRole(me.role);
+      document.getElementById('admin-nav').style.display = isAdmin ? 'flex' : 'none';
+      document.getElementById('admin-logs-nav').style.display = isAdmin ? 'flex' : 'none';
+
+      if (me.currency) {
+        displayCurrency = me.currency;
+      }
+    }
+
+    function postStudioContext() {
+      const iframe = document.getElementById('studio-iframe');
+      if (!iframe || !iframe.contentWindow) return;
+
+      if (currentSession) {
+        iframe.contentWindow.postMessage({ type: 'AUTH_TOKEN', token: currentSession.access_token }, window.location.origin);
+      }
+
+      if (me) {
+        iframe.contentWindow.postMessage({
+          type: 'STUDIO_PROFILE',
+          profile: { email: me.email, role: me.role, credits: me.credits }
+        }, window.location.origin);
+      }
+    }
+
     async function loadRates() {
       try {
         const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
@@ -1500,6 +1765,31 @@
       await loadRates();
     }
     let pagesCache = [];
+    const automationViews = ['pages', 'kb', 'products', 'images', 'logs'];
+
+    function isAutomationView(view) {
+      return automationViews.includes(view);
+    }
+
+    function getLastAutomationView() {
+      const savedView = localStorage.getItem('blockscom_last_automation_view');
+      return isAutomationView(savedView) ? savedView : 'pages';
+    }
+
+    function openAutomationApp() {
+      showView(getLastAutomationView());
+    }
+
+    function syncAutomationShell(view) {
+      const isAutomation = isAutomationView(view);
+      const automationShell = document.getElementById('automation-shell');
+      const automationNav = document.getElementById('nav-automation');
+      if (automationShell) automationShell.classList.toggle('active', isAutomation);
+      if (automationNav) automationNav.classList.toggle('active', isAutomation);
+      document.querySelectorAll('[data-automation-view]').forEach(tab => {
+        tab.classList.toggle('active', tab.getAttribute('data-automation-view') === view);
+      });
+    }
 
     async function updateSnippetTheme(pageId, widgetKey, theme) {
       const codeEl = document.getElementById('snippet-code-' + pageId);
@@ -1537,14 +1827,7 @@
       const cachedMeStr = localStorage.getItem('blockscom_user_profile');
       if (cachedMeStr) {
         try {
-          const cachedMe = JSON.parse(cachedMeStr);
-          document.getElementById('u-tier').innerText = `TIER: ${cachedMe.role}`;
-          document.getElementById('u-credits').innerText = `Credits: ${cachedMe.credits.toLocaleString()}`;
-          if (cachedMe.role === 'ADMIN') {
-            document.getElementById('admin-nav').style.display = 'flex';
-            document.getElementById('admin-logs-nav').style.display = 'flex';
-          }
-          if (cachedMe.currency) displayCurrency = cachedMe.currency;
+          applyUserProfile(JSON.parse(cachedMeStr));
         } catch (e) { }
       }
 
@@ -1558,20 +1841,8 @@
       fetch('/api/me', { headers: { 'Authorization': `Bearer ${currentSession.access_token}` } })
         .then(async res => {
           if (!res.ok) { logout(); return; }
-          me = await res.json();
-          localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
-
-          if (me.currency) {
-            displayCurrency = me.currency;
-          }
-
-          document.getElementById('u-email').innerText = me.email;
-          document.getElementById('u-tier').innerText = `TIER: ${me.role}`;
-          document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
-          if (me.role === 'ADMIN') {
-            document.getElementById('admin-nav').style.display = 'flex';
-            document.getElementById('admin-logs-nav').style.display = 'flex';
-          }
+          applyUserProfile(await res.json());
+          postStudioContext();
 
           await loadRates();
 
@@ -1920,7 +2191,7 @@
           return;
         }
 
-        if (me && me.role !== 'ADMIN') {
+        if (me && !isAdminRole(me.role)) {
           me.credits = Math.max(0, (me.credits || 0) - 2);
           document.getElementById('u-credits').innerText = `Credits: ${me.credits.toLocaleString()}`;
           localStorage.setItem('blockscom_user_profile', JSON.stringify(me));
@@ -1972,7 +2243,7 @@
       document.getElementById('admin-users').innerHTML = users.map(u => `
         <tr>
           <td><div style="font-weight:600">${escapeHtml(u.email)}</div><div style="font-size:0.7rem; color:var(--text-dim)">${u.id}</div></td>
-          <td><span class="badge ${u.role === 'ADMIN' ? 'badge-premium' : 'badge-free'}">${u.role}</span></td>
+          <td><span class="badge ${isAdminRole(u.role) ? 'badge-premium' : 'badge-free'}">${getPlanRole(u.role)}</span></td>
           <td style="font-weight:700">${u.credits.toLocaleString()}</td>
           <td><button class="btn btn-secondary" onclick="editUser('${escapeHtml(u.id)}', ${u.credits}, '${escapeHtml(u.role)}', '${escapeHtml(u.email).replace(/'/g, "\\'")}')">Manage</button></td>
         </tr>
@@ -1980,24 +2251,33 @@
     }
 
     function showView(view) {
+      const validViews = ['pages', 'kb', 'products', 'images', 'logs', 'studio', 'settings', 'admin', 'admin-logs'];
+      if (!validViews.includes(view)) {
+        view = 'pages';
+      }
+
       // Close sidebar on mobile after selecting a page
       document.querySelector('.sidebar').classList.remove('open');
 
       // Guard for FREE tier trying to access premium features
-      if (view === 'images' && me && me.role === 'FREE') {
+      if (view === 'images' && me && getPlanRole(me.role) === 'FREE') {
         alert('Image upload and Trigger Photos are only available for Premium Members. Free members can only use Auto reply features.');
         return; // Block view change
       }
 
       // Guard: only ADMIN can access the admin view
-      if (view === 'admin' && (!me || me.role !== 'ADMIN')) {
+      if (view === 'admin' && (!me || !isAdminRole(me.role))) {
         view = 'pages';
       }
       document.querySelectorAll('.view-section').forEach(d => d.style.display = 'none');
       document.getElementById('view-' + view).style.display = 'block';
       localStorage.setItem('blockscom_active_view', view);
+      if (isAutomationView(view)) {
+        localStorage.setItem('blockscom_last_automation_view', view);
+      }
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      const navId = view === 'admin' ? 'admin-nav' : view === 'admin-logs' ? 'admin-logs-nav' : 'nav-' + view;
+      syncAutomationShell(view);
+      const navId = isAutomationView(view) ? 'nav-automation' : view === 'admin' ? 'admin-nav' : view === 'admin-logs' ? 'admin-logs-nav' : 'nav-' + view;
       const nav = document.getElementById(navId);
       if (nav) nav.classList.add('active');
       if (view === 'admin') loadAdminUsers();
@@ -2007,7 +2287,21 @@
       if (view === 'pages') loadPages();
       if (view === 'products') loadInvTables();
       if (view === 'images') loadImages();
+      if (view === 'studio') {
+        postStudioContext();
+      }
     }
+
+    // Sync auth and credits with the studio iframe
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'REQUEST_AUTH') {
+        postStudioContext();
+      }
+      if (event.data?.type === 'STUDIO_CREDITS_UPDATED' && Number.isFinite(Number(event.data.credits))) {
+        applyUserProfile({ credits: Number(event.data.credits) });
+      }
+    });
 
     // ==================== FLEXIBLE INVENTORY SYSTEM JS ====================
     let invTablesCache = [];
@@ -2021,7 +2315,7 @@
         invTablesCache = await res.json();
       } catch (e) { invTablesCache = []; }
 
-      const role = me?.role || 'FREE';
+      const role = getPlanRole(me?.role);
       const limits = { FREE: 1, PREMIUM: 10, ENTERPRISE: '∞', ADMIN: '∞' };
       const list = document.getElementById('inv-tables-list');
       if (invTablesCache.length === 0) {
@@ -2466,7 +2760,7 @@
       // Restrict model dropdown for FREE users
       const modelSelect = document.getElementById('p-model');
       const restrictionNote = document.getElementById('model-restriction-note');
-      const isFree = me && me.role === 'FREE';
+      const isFree = me && getPlanRole(me.role) === 'FREE';
       Array.from(modelSelect.options).forEach(opt => {
         if (opt.dataset.tier === 'paid') {
           opt.disabled = isFree;
@@ -2711,7 +3005,7 @@
     function openTemplatePicker() {
       // Check limits first
       const roleLimits = { 'FREE': 3, 'PREMIUM': 10, 'ENTERPRISE': 20, 'ADMIN': 99999 };
-      const userRole = me?.role || 'FREE';
+      const userRole = getPlanRole(me?.role);
       const limit = roleLimits[userRole] || 1;
       if (kbOptions.length >= limit) {
         alert(`Your current tier (${userRole}) is limited to ${limit} Knowledge Base item(s). Please upgrade to add more.`);
@@ -2973,7 +3267,7 @@
           'ENTERPRISE': 20,
           'ADMIN': 99999
         };
-        const userRole = me?.role || 'FREE';
+        const userRole = getPlanRole(me?.role);
         const limit = roleLimits[userRole] || 1;
 
         if (kbOptions.length >= limit) {
@@ -3043,7 +3337,7 @@
       document.getElementById('admin-um-id').value = id;
       document.getElementById('admin-um-email').innerText = email;
       document.getElementById('admin-um-credits').value = credits;
-      document.getElementById('admin-um-role').value = role;
+      document.getElementById('admin-um-role').value = normalizeRole(role);
       document.getElementById('adminUserModal').style.display = 'flex';
     }
 
@@ -3399,7 +3693,7 @@ Your replies must feel like:
         ]);
         const imgData = await imgRes.json();
         imagesCache = imgData.images || [];
-        const role = me?.role || 'FREE';
+        const role = getPlanRole(me?.role);
         const limits = { FREE: 3, PREMIUM: 50, ENTERPRISE: '∞', ADMIN: '∞' };
         document.getElementById('img-usage-badge').innerText = `${imgData.used || 0} / ${limits[role] || 3} images`;
         triggerPhotosCache = await tpRes.json();
@@ -3701,7 +3995,7 @@ Your replies must feel like:
     }
 
     function checkOrdersAccess() {
-      if (me && me.role === 'FREE') {
+      if (me && getPlanRole(me.role) === 'FREE') {
         alert('Order Page taking features are only available for Premium Members. Free members can only use Auto reply features.');
       } else {
         window.location.href = '/orders.html';

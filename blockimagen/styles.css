@@ -1,0 +1,439 @@
+/* Shared Variables */
+:root {
+  --accent-2: #ffffff;
+  --stroke: rgba(255, 255, 255, 0.08);
+  --muted: #888888;
+  --text: #ffffff;
+  --brand-black: #050505;
+  --brand-dark: #0a0a0a;
+}
+
+/* Reset Cursor for immersive feel */
+body {
+  cursor: none;
+  background-color: var(--brand-black) !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+/* Dynamic Glowing Background Blobs */
+body::before, body::after {
+  content: '';
+  position: fixed;
+  width: 70vw;
+  height: 70vw;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1; /* Below grid */
+  filter: blur(140px);
+  opacity: 0.12;
+  animation: floatBlobs 25s infinite alternate ease-in-out;
+}
+body::before {
+  top: -20vw; left: -20vw;
+  background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 60%);
+}
+body::after {
+  bottom: -20vw; right: -10vw;
+  background: radial-gradient(circle, rgba(59,130,246,0.6) 0%, transparent 60%);
+  animation-delay: -12s;
+  animation-duration: 30s;
+}
+
+@keyframes floatBlobs {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(4vw, 8vw) scale(1.1); }
+  100% { transform: translate(-5vw, 4vw) scale(0.95); }
+}
+
+/* Grid overlay tuning */
+.grid-bg {
+  z-index: 2;
+  opacity: 0.05 !important;
+  mask-image: radial-gradient(circle at 50% 30%, black, transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at 50% 30%, black, transparent 70%);
+}
+
+.noise-bg {
+  z-index: 9000;
+  opacity: 0.03;
+}
+
+/* Glass Panels Upgrade */
+.glass-panel {
+  background: rgba(12, 12, 12, 0.5) !important;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 
+    0 24px 40px -8px rgba(0, 0, 0, 0.5), 
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  border-radius: 20px !important;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 
+    0 30px 50px -10px rgba(0, 0, 0, 0.6), 
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Inputs & Form Elements */
+label {
+  font-size: 0.75rem !important;
+  letter-spacing: 0.05em !important;
+  color: #a3a3a3 !important;
+  margin-bottom: 6px !important;
+  display: block;
+}
+
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  font-size: 0.85rem !important;
+  padding: 12px 16px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  color: #fff !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06) !important;
+  outline: none !important;
+}
+
+/* Fix dropdown options coloring */
+select option {
+  background-color: #050505;
+  color: #cccccc;
+}
+
+/* File Drop Zones */
+.drop-zone {
+  min-height: 110px !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px !important;
+  transition: all 0.3s ease !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.drop-zone i {
+  width: 20px !important;
+  height: 20px !important;
+  margin-bottom: 6px;
+  color: #888 !important;
+  transition: color 0.3s, transform 0.3s !important;
+}
+
+.drop-zone span {
+  font-size: 0.75rem !important;
+  color: #888 !important;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.drop-zone:hover i {
+  color: #fff !important;
+  transform: translateY(-2px);
+}
+
+.drop-zone:hover span {
+  color: #fff !important;
+}
+
+/* Feature Tabs Dropdown & Mobile Tabs */
+#feature-tabs {
+  background: rgba(12, 12, 12, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 6px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6) !important;
+}
+
+.tab-btn {
+  border-radius: 10px !important;
+  margin-bottom: 2px !important;
+  font-size: 0.75rem !important;
+  border: none !important;
+  padding: 10px 18px !important;
+  background: transparent !important;
+  color: rgba(255,255,255,0.6) !important;
+  transition: all 0.2s ease !important;
+  font-family: 'Space Grotesk', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+.tab-btn.active {
+  background: #ffffff !important;
+  color: #000 !important;
+  font-weight: 600 !important;
+}
+
+/* Tags / Chips */
+.chip span {
+  font-size: 0.75rem !important;
+  padding: 6px 14px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.3s ease !important;
+}
+.chip span:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+.chip input:checked + span {
+  background: #fff !important;
+  color: #000 !important;
+  border-color: #fff !important;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Buttons Styling */
+
+
+button[type="submit"]#generate {
+  background: #ffffff !important;
+  color: #050505 !important;
+  border-radius: 14px !important;
+  padding: 0 24px !important;
+  height: 52px !important;
+  box-shadow: 0 8px 25px rgba(255, 255, 255, 0.2), inset 0 -2px 0 rgba(0,0,0,0.1) !important;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+button[type="submit"]#generate:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 15px 35px rgba(255, 255, 255, 0.3), inset 0 -2px 0 rgba(0,0,0,0.1) !important;
+}
+
+button[type="submit"]#generate:active {
+  transform: scale(0.95) !important;
+}
+
+/* Generate Bar Bottom Widget */
+#generate-bar .glass-panel {
+  padding: 10px !important;
+  border-radius: 20px !important;
+  background: rgba(5, 5, 5, 0.7) !important;
+  box-shadow: 0 40px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+
+#prompt {
+  font-size: 1rem !important;
+  padding: 14px 16px !important;
+  background: transparent !important;
+  border: none !important;
+}
+#prompt:focus {
+  box-shadow: none !important;
+}
+
+/* Previews Grid & Items */
+.preview-grid { display: grid; gap: 8px; }
+.preview-grid a.absolute { display: none !important; }
+
+.preview-item {
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  aspect-ratio: 1;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.preview-single { width: 100%; height: 100%; }
+.preview-single img, .preview-item img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.3s ease;
+  display: block;
+}
+.preview-item:hover img { transform: scale(1.05); }
+
+/* Remove buttons */
+.preview-remove {
+  position: absolute; top: 4px; right: 4px; z-index: 10;
+  background: rgba(0, 0, 0, 0.7) !important;
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  padding: 4px !important;
+  border-radius: 999px; cursor: pointer;
+  transition: all 0.2s ease !important;
+}
+.preview-remove:hover {
+  background: rgb(239, 68, 68) !important;
+  border-color: rgb(239, 68, 68) !important;
+  transform: scale(1.1);
+}
+
+/* Gallery Cards */
+.card {
+  background: rgba(20, 20, 20, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 20px !important;
+  padding: 12px !important;
+  backdrop-filter: blur(20px);
+  display: flex; flex-direction: column; gap: 12px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  animation: fadeUp 0.6s ease both;
+}
+
+.card:hover {
+  transform: translateY(-8px) scale(1.015) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 24px rgba(255,255,255,0.05) !important;
+}
+
+.card img {
+  border-radius: 14px !important;
+  transition: transform 0.4s ease !important;
+}
+.card:hover img {
+  transform: scale(1.03);
+}
+
+.card-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.card-actions a, .card-actions button {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 8px 14px !important;
+  font-size: 0.75rem !important;
+  border-radius: 999px !important;
+  color: var(--muted);
+  font-family: 'Space Grotesk', monospace;
+  text-decoration: none;
+  cursor: pointer; transition: all 0.2s;
+}
+.card-actions a:hover, .card-actions button:hover {
+  background: #ffffff !important;
+  color: #000 !important;
+  border-color: #fff !important;
+  transform: translateY(-1px);
+}
+.card.skeleton { gap: 10px; }
+
+/* Skeletons */
+.skeleton-block {
+  height: 12px;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)) !important;
+  background-size: 200% 200% !important;
+  border-radius: 12px !important;
+  animation: shimmer 1.5s ease infinite;
+}
+.skeleton-block.image { height: 200px; border-radius: 14px; }
+.skeleton-block.short { width: 60%; }
+
+/* Editor Updates */
+body.editor-open { overflow: hidden; }
+.editor-modal {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10050;
+}
+.editor-modal.hidden { display: none; }
+.editor-backdrop {
+  position: absolute; inset: 0; background: rgba(5, 5, 5, 0.75); backdrop-filter: blur(12px);
+}
+.editor-panel {
+  position: relative; width: min(92vw, 980px); max-height: 88vh;
+  background: rgba(10, 10, 10, 0.85) !important;
+  backdrop-filter: blur(40px) saturate(150%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 28px !important;
+  padding: 18px; display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.8) !important; z-index: 1;
+}
+
+.editor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.editor-color-pill, .editor-tool-pill, .editor-size-pill {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.editor-color-btn {
+  width: 16px; height: 16px; border-radius: 999px; border: 2px solid transparent; cursor: pointer; padding: 0;
+}
+.editor-color-btn.active { border-color: #ffffff; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2); }
+
+#editor-brush-size { width: 120px; accent-color: #ffffff; cursor: pointer; }
+#editor-brush-label { min-width: 18px; text-align: center; color: rgba(255, 255, 255, 0.8); font-family: 'Space Grotesk', monospace; font-size: 0.7rem; }
+.editor-tool {
+  border: none; background: transparent; color: rgba(255, 255, 255, 0.6); width: 30px; height: 30px;
+  border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Space Grotesk', monospace; font-size: 0.9rem; cursor: pointer; transition: all 0.2s ease;
+}
+.editor-tool.active { color: #0a0a0a; background: #ffffff; }
+
+.editor-canvas-wrap {
+  position: relative; flex: 1; min-height: 45vh; border-radius: 18px; overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12); background: #0b0b0b;
+  display: flex; align-items: center; justify-content: center;
+}
+#editor-canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; display: block; touch-action: none; cursor: crosshair; }
+.editor-loading {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.65); color: #cfcfcf; font-family: 'Space Grotesk', monospace; font-size: 0.85rem;
+  letter-spacing: 0.1em; text-transform: uppercase; z-index: 2;
+}
+
+.editor-text-input {
+  position: absolute; z-index: 3; min-width: 160px; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.7); color: #ffffff;
+  font-family: 'Space Grotesk', monospace; font-size: 18px; outline: none;
+}
+.editor-text-input.hidden { display: none; }
+
+.editor-actions { display: flex; align-items: center; gap: 10px; }
+.editor-actions button {
+  border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.05);
+  color: #d2d2d2; font-size: 0.75rem; padding: 8px 16px; cursor: pointer;
+  font-family: 'Space Grotesk', monospace; text-transform: uppercase; letter-spacing: 0.08em; transition: all 0.2s ease;
+}
+.editor-actions button:hover { border-color: #ffffff; color: #ffffff; background: rgba(255, 255, 255, 0.15); }
+.editor-actions #editor-save { background: #ffffff; color: #050505; }
+.editor-actions #editor-save:hover { background: #f1f1f1; }
+.editor-action-spacer { flex: 1; }
+
+/* Custom Cursor */
+.cursor-dot { width: 6px; height: 6px; background-color: #fff; position: fixed; border-radius: 50%; pointer-events: none; z-index: 9999; }
+.cursor-outline { width: 36px; height: 36px; border: 1px solid rgba(255,255,255,0.3); position: fixed; border-radius: 50%; pointer-events: none; z-index: 9999; transition: width 0.2s, height 0.2s, background-color 0.2s; }
+body.hovering .cursor-outline { width: 50px; height: 50px; background-color: rgba(255,255,255,0.05); border-color: transparent; }
+
+/* Product Suggestions Container */
+#product-suggestions p { font-size: 0.8rem !important; margin-bottom: 4px; color: #ccc !important; }
+
+/* Ensure gallery empty looks good */
+.gallery-empty {
+  background: rgba(255,255,255,0.02) !important;
+  border: 1px dashed rgba(255,255,255,0.1) !important;
+  border-radius: 24px !important;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "nano-banana-studio",
+  "version": "1.0.0",
+  "description": "Nano Banana Studio — AI Image Generator by Blockscom Media",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3"
+  }
+}

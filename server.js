@@ -4,6 +4,8 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const compression = require('compression');
+const fs = require('fs');
+const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -15,6 +17,8 @@ const IS_PROD = process.env.NODE_ENV === 'production' || process.env.VERCEL === 
 function debugLog(...args) { if (!IS_PROD) console.log(...args); }
 
 const app = express();
+app.set('trust proxy', Number(process.env.TRUST_PROXY || 1));
+app.disable('x-powered-by');
 
 // CORS — allow known domains + widget origins
 const ALLOWED_ORIGINS = [
@@ -39,8 +43,18 @@ app.use((req, res, next) => {
 });
 
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+const defaultJsonParser = express.json({ limit: '10mb' });
+const defaultUrlencodedParser = express.urlencoded({ extended: true, limit: '10mb' });
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/studio/')) return next();
+  return defaultJsonParser(req, res, next);
+});
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/studio/')) return next();
+  return defaultUrlencodedParser(req, res, next);
+});
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     // Only disable cache for HTML and config files (they contain dynamic content)
@@ -65,6 +79,141 @@ if (!process.env.SUPABASE_URL) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const STUDIO_MEDIA_BUCKET = process.env.STUDIO_MEDIA_BUCKET || 'studio-generated-media';
+let studioMediaBucketReady = false;
+
+async function ensureStudioMediaBucket() {
+  if (studioMediaBucketReady) return;
+
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+  if (listError) {
+    throw new Error(`Failed to list Supabase storage buckets: ${listError.message}`);
+  }
+
+  const exists = (buckets || []).some((bucket) => bucket.name === STUDIO_MEDIA_BUCKET);
+  if (!exists) {
+    const { error: createError } = await supabase.storage.createBucket(STUDIO_MEDIA_BUCKET, { public: true });
+    if (createError && !/already exists/i.test(createError.message || '')) {
+      throw new Error(`Failed to create Supabase storage bucket: ${createError.message}`);
+    }
+  }
+
+  studioMediaBucketReady = true;
+}
+
+function buildStudioMediaTaskId(userId, mediaType, sourceId = crypto.randomUUID()) {
+  return `${userId}:${mediaType}:${sourceId}`;
+}
+
+function inferStudioMediaType(taskId, fileUrl = '') {
+  const parts = String(taskId || '').split(':');
+  if (parts[1] === 'image' || parts[1] === 'video') return parts[1];
+  return /\.mp4($|\?)/i.test(fileUrl) ? 'video' : 'image';
+}
+
+function inferStudioMediaPathFromUrl(fileUrl) {
+  const marker = `/storage/v1/object/public/${STUDIO_MEDIA_BUCKET}/`;
+  const index = String(fileUrl || '').indexOf(marker);
+  if (index === -1) return null;
+  return decodeURIComponent(fileUrl.slice(index + marker.length));
+}
+
+function normalizeStudioMediaRecord(row) {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    mediaType: inferStudioMediaType(row.task_id, row.video_url),
+    src: row.video_url,
+    promptText: row.prompt || '',
+    modelName: row.model_name || '',
+    aspectRatio: row.aspect_ratio || '',
+    createdAt: row.created_at
+  };
+}
+
+async function saveStudioMediaRecord({
+  userId,
+  mediaType,
+  buffer,
+  contentType,
+  promptText = '',
+  modelName = '',
+  aspectRatio = '',
+  sourceFeature = '',
+  originalTaskId = '',
+  fileExtension = ''
+}) {
+  await ensureStudioMediaBucket();
+
+  const safeExt = fileExtension || (contentType === 'video/mp4' ? 'mp4' : 'png');
+  const storagePath = `${userId}/${mediaType}/${Date.now()}-${crypto.randomUUID()}.${safeExt}`;
+
+  const { error: uploadError } = await supabase.storage.from(STUDIO_MEDIA_BUCKET).upload(storagePath, buffer, {
+    contentType,
+    upsert: false
+  });
+  if (uploadError) {
+    throw new Error(`Supabase storage upload failed: ${uploadError.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from(STUDIO_MEDIA_BUCKET).getPublicUrl(storagePath);
+  const publicUrl = urlData?.publicUrl || '';
+  const taskId = buildStudioMediaTaskId(userId, mediaType, originalTaskId || crypto.randomUUID());
+  const storedModelName = [sourceFeature, modelName].filter(Boolean).join(' | ');
+
+  const { data: savedRow, error: insertError } = await supabase.from('videos').insert([{
+    task_id: taskId,
+    video_url: publicUrl,
+    prompt: promptText || null,
+    model_name: storedModelName || null,
+    aspect_ratio: aspectRatio || null
+  }]).select().single();
+
+  if (insertError) {
+    await supabase.storage.from(STUDIO_MEDIA_BUCKET).remove([storagePath]).catch(() => null);
+    throw new Error(`Supabase media metadata insert failed: ${insertError.message}`);
+  }
+
+  return normalizeStudioMediaRecord(savedRow);
+}
+
+// ==================== IMAGE STUDIO (BLOCKIMAGEN) CONFIG ====================
+const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_API_KEY_UNLIMITED = process.env.OPENROUTER_API_KEY_UNLIMITED;
+const OPENROUTER_API_KEY_LIMITED = process.env.OPENROUTER_API_KEY_LIMITED;
+const KLING_ACCESS_KEY = process.env.KLING_ACCESS_KEY;
+const KLING_SECRET_KEY = process.env.KLING_SECRET_KEY;
+
+let cachedKlingToken = null;
+let klingTokenExpiration = 0;
+const generateKlingToken = () => {
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (cachedKlingToken && klingTokenExpiration > nowSec + 300) return cachedKlingToken;
+  const payload = { iss: KLING_ACCESS_KEY, exp: nowSec + 1800, nbf: nowSec - 5 };
+  cachedKlingToken = jwt.sign(payload, KLING_SECRET_KEY, { algorithm: 'HS256', header: { alg: 'HS256', typ: 'JWT' } });
+  klingTokenExpiration = payload.exp;
+  return cachedKlingToken;
+};
+
+function getStudioAuthHeader(userRole) {
+  const key = userRole === 'ENTERPRISE' ? OPENROUTER_API_KEY_UNLIMITED : OPENROUTER_API_KEY_LIMITED;
+  return `Bearer ${key || process.env.OPENROUTER_API_KEY}`;
+}
+
+function normalizeRole(role) {
+  return String(role || 'user').trim().toLowerCase();
+}
+
+function isAdminRole(role) {
+  return normalizeRole(role) === 'admin';
+}
+
+function getPlanRole(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === 'admin') return 'ADMIN';
+  if (normalized === 'manager') return 'PREMIUM';
+  return 'FREE';
+}
 
 // Secret encryption helpers (AES-256-GCM)
 const ENC_KEY = crypto.createHash('sha256').update(process.env.TOKEN_ENCRYPTION_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'blockscom-default-key').digest();
@@ -74,9 +223,17 @@ if (!process.env.TOKEN_ENCRYPTION_KEY) {
 
 // Simple in-memory rate limiter for public endpoints
 const rateLimitMap = new Map();
+function getClientIp(req) {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
 function rateLimit(windowMs, maxRequests) {
   return (req, res, next) => {
-    const key = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    const key = getClientIp(req);
     const now = Date.now();
     const entry = rateLimitMap.get(key);
     if (!entry || now - entry.start > windowMs) {
@@ -217,6 +374,39 @@ setInterval(() => {
   }
 }, 60000);
 
+async function getProfileCredits(userId) {
+  const { data, error } = await supabase.from('profiles').select('credits').eq('id', userId).single();
+  if (error) throw new Error(error.message || 'Failed to fetch profile credits.');
+  return Number(data?.credits || 0);
+}
+
+async function deductCredits(userId, amount, currentCredits) {
+  const numericAmount = Math.max(0, Number(amount) || 0);
+  let startingCredits = Number(currentCredits);
+
+  if (!Number.isFinite(startingCredits)) {
+    startingCredits = await getProfileCredits(userId);
+  }
+
+  const fallbackCredits = Math.max(0, startingCredits - numericAmount);
+  const { error: rpcError } = await supabase.rpc('deduct_credits', { user_id: userId, amount: numericAmount });
+
+  if (rpcError) {
+    console.warn(`[CREDITS] deduct_credits RPC failed for ${userId}: ${rpcError.message}. Falling back to direct profile update.`);
+    const { error: updateError } = await supabase.from('profiles').update({ credits: fallbackCredits }).eq('id', userId);
+    if (updateError) throw new Error(updateError.message || 'Failed to update profile credits.');
+  }
+
+  profileCache.delete(userId);
+
+  try {
+    return await getProfileCredits(userId);
+  } catch (fetchError) {
+    console.warn(`[CREDITS] Failed to refetch credits for ${userId}: ${fetchError.message}`);
+    return fallbackCredits;
+  }
+}
+
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'No auth header' });
@@ -232,7 +422,7 @@ async function requireAuth(req, res, next) {
     const { data: dbProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
     if (!dbProfile) {
-      const { data: newProfile } = await supabase.from('profiles').insert([{ id: user.id, email: user.email, credits: 50, role: 'FREE' }]).select().single();
+      const { data: newProfile } = await supabase.from('profiles').insert([{ id: user.id, email: user.email, credits: 50, role: 'user' }]).select().single();
       profile = newProfile;
     } else {
       profile = dbProfile;
@@ -250,6 +440,7 @@ app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public/login.
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public/index.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public/dashboard.html')));
 app.get('/fb-setup-docs.html', (req, res) => res.sendFile(path.join(__dirname, 'public/fb-setup-docs.html')));
+app.get('/healthz', (_req, res) => res.json({ ok: true, service: 'blockscomwebsite', uptime: Math.round(process.uptime()) }));
 
 // API: Get Current User
 app.get('/api/me', requireAuth, (req, res) => res.json(req.user.profile));
@@ -305,7 +496,7 @@ app.post('/api/pages', requireAuth, async (req, res) => {
 
     // Enforce model restrictions for FREE users
     const FREE_MODELS = ['openai/gpt-oss-safeguard-20b'];
-    const resolvedModel = (req.user.profile.role === 'FREE' && !FREE_MODELS.includes(ai_model))
+    const resolvedModel = (getPlanRole(req.user.profile.role) === 'FREE' && !FREE_MODELS.includes(ai_model))
       ? 'openai/gpt-oss-safeguard-20b'
       : ai_model;
 
@@ -483,7 +674,7 @@ app.post('/api/knowledge', requireAuth, async (req, res) => {
       'ADMIN': 99999
     };
 
-    const userRole = req.user.profile.role || 'FREE';
+    const userRole = getPlanRole(req.user.profile.role);
     const limit = roleLimits[userRole] || 1;
 
     const { count, error: countErr } = await supabase
@@ -578,7 +769,7 @@ app.post('/api/kb/import', requireAuth, async (req, res) => {
 
     // Check role limits
     const roleLimits = { 'FREE': 3, 'PREMIUM': 10, 'ENTERPRISE': 20, 'ADMIN': 99999 };
-    const userRole = req.user.profile.role || 'FREE';
+    const userRole = getPlanRole(req.user.profile.role);
     const limit = roleLimits[userRole] || 3;
 
     const { count: existing } = await supabase
@@ -700,7 +891,7 @@ app.post('/api/inventory/tables', requireAuth, async (req, res) => {
     }
 
     // Create new — check limits
-    const role = req.user.profile.role || 'FREE';
+    const role = getPlanRole(req.user.profile.role);
     const limit = TABLE_LIMITS[role] || 1;
     const { count } = await supabase.from('inventory_tables').select('*', { count: 'exact', head: true }).eq('profile_id', req.user.id);
     if (count >= limit) return res.status(403).json({ error: `Your ${role} tier is limited to ${limit} spreadsheet(s). Please upgrade.` });
@@ -846,7 +1037,7 @@ app.get('/api/images', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('user_images').select('*').eq('profile_id', req.user.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
 
-  const role = req.user.profile.role || 'FREE';
+  const role = getPlanRole(req.user.profile.role);
   const limit = IMAGE_LIMITS[role] || 3;
   res.json({ images: data || [], limit, used: (data || []).length });
 });
@@ -854,7 +1045,7 @@ app.get('/api/images', requireAuth, async (req, res) => {
 // API: Upload image (single)
 app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, res) => {
   try {
-    const role = req.user.profile?.role || 'FREE';
+    const role = getPlanRole(req.user.profile?.role);
     if (role === 'FREE') {
       return res.status(403).json({ error: 'Image upload is only available for Premium members.' });
     }
@@ -905,7 +1096,7 @@ app.post('/api/images/upload', requireAuth, upload.single('image'), async (req, 
 // API: Upload multiple images at once
 app.post('/api/images/upload-multiple', requireAuth, upload.array('images', 10), async (req, res) => {
   try {
-    const role = req.user.profile?.role || 'FREE';
+    const role = getPlanRole(req.user.profile?.role);
     if (role === 'FREE') {
       return res.status(403).json({ error: 'Image upload is only available for Premium members.' });
     }
@@ -990,7 +1181,7 @@ app.get('/api/trigger-photos', requireAuth, async (req, res) => {
 // API: Create or update trigger photo (supports multiple image_ids)
 app.post('/api/trigger-photos', requireAuth, async (req, res) => {
   try {
-    const role = req.user.profile?.role || 'FREE';
+    const role = getPlanRole(req.user.profile?.role);
     if (role === 'FREE') {
       return res.status(403).json({ error: 'Trigger Photos are only available for Premium members.' });
     }
@@ -1068,7 +1259,7 @@ app.delete('/api/trigger-photos/:id', requireAuth, async (req, res) => {
 
 // API: Admin - Get All Users
 app.get('/api/admin/users', requireAuth, async (req, res) => {
-  if (req.user.profile.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+  if (!isAdminRole(req.user.profile.role)) return res.status(403).json({ error: 'Forbidden' });
   const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -1076,16 +1267,20 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
 
 // API: Admin - Edit User Credits/Role
 app.put('/api/admin/users/:id', requireAuth, async (req, res) => {
-  if (req.user.profile.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+  if (!isAdminRole(req.user.profile.role)) return res.status(403).json({ error: 'Forbidden' });
   const { credits, role } = req.body;
-  const { error } = await supabase.from('profiles').update({ credits, role }).eq('id', req.params.id);
+  const normalizedRole = normalizeRole(role);
+  if (!['user', 'manager', 'admin'].includes(normalizedRole)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  const { error } = await supabase.from('profiles').update({ credits, role: normalizedRole }).eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 
 // API: Admin - Get All Activity Logs (with user + page info)
 app.get('/api/admin/logs', requireAuth, async (req, res) => {
-  if (req.user.profile.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+  if (!isAdminRole(req.user.profile.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const { data, error } = await supabase
       .from('activity_logs')
@@ -1101,7 +1296,7 @@ app.get('/api/admin/logs', requireAuth, async (req, res) => {
 
 // API: Admin - Get All Pages (webhook status overview)
 app.get('/api/admin/pages', requireAuth, async (req, res) => {
-  if (req.user.profile.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+  if (!isAdminRole(req.user.profile.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const { data, error } = await supabase
       .from('fb_pages')
@@ -1175,7 +1370,7 @@ app.post('/api/logs/analyze', requireAuth, async (req, res) => {
   try {
     // Filter logs at DB level for data isolation (admins see all)
     let relevantLogs;
-    if (req.user.profile.role === 'ADMIN') {
+    if (isAdminRole(req.user.profile.role)) {
       const { data, error } = await supabase.from('activity_logs').select('*, fb_pages(name, profile_id)').order('created_at', { ascending: false }).limit(50);
       if (error) throw error;
       relevantLogs = data;
@@ -1204,7 +1399,7 @@ app.post('/api/logs/analyze', requireAuth, async (req, res) => {
     }).join('\n\n---\n\n');
 
     // Check Credits (cost is 2 credits)
-    if (req.user.profile.role !== 'ADMIN') {
+    if (!isAdminRole(req.user.profile.role)) {
       if ((req.user.profile.credits || 0) < 2) {
         return res.status(402).json({ error: "Insufficient credits. Analyzing chatlogs requires 2 credits." });
       }
@@ -1241,14 +1436,8 @@ Please format nicely with headers and bullet points.`
     const report = aiRes.data?.choices?.[0]?.message?.content || 'Unable to generate analysis at this time.';
 
     // Deduct 2 credits atomically (floor at 0)
-    if (req.user.profile.role !== 'ADMIN') {
-      try {
-        await supabase.rpc('deduct_credits', { user_id: req.user.id, amount: 2 }).single();
-      } catch (_rpcErr) {
-        // Fallback if RPC function not yet created in Supabase
-        const newCredits = Math.max(0, (req.user.profile.credits || 0) - 2);
-        await supabase.from('profiles').update({ credits: newCredits }).eq('id', req.user.id);
-      }
+    if (!isAdminRole(req.user.profile.role)) {
+      req.user.profile.credits = await deductCredits(req.user.id, 2, req.user.profile.credits);
     }
 
     res.json({ success: true, report });
@@ -1304,11 +1493,11 @@ app.post('/api/widget/message', rateLimit(60000, 20), async (req, res) => {
 
     const userProfile = page.profiles;
     const creditCost = ['openai/gpt-oss-120b', 'google/gemini-2.5-flash-lite', 'google/gemini-3-flash-preview', 'openai/gpt-5-nano'].includes(page.ai_model) ? 2 : 1;
-    if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) < creditCost) {
+    if (userProfile && !isAdminRole(userProfile.role) && (userProfile.credits || 0) < creditCost) {
       return res.status(402).json({ error: 'out of credits' });
     }
 
-    const canReply = await checkDailyLimit(page.profile_id, userProfile?.role || 'FREE');
+    const canReply = await checkDailyLimit(page.profile_id, userProfile?.role);
     if (!canReply) {
       return res.status(429).json({ error: 'daily reply limit reached for your tier' });
     }
@@ -1508,19 +1697,339 @@ INSTRUCTIONS:
     ]);
 
     // Deduct credits atomically for widget replies
-    if (userProfile && userProfile.role !== 'ADMIN') {
-      try {
-        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: creditCost }).single();
-      } catch (_rpcErr) {
-        // Fallback if RPC function not yet created in Supabase
-        const newCredits = Math.max(0, (userProfile.credits || 0) - creditCost);
-        await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
-      }
+    if (userProfile && !isAdminRole(userProfile.role)) {
+      userProfile.credits = await deductCredits(page.profile_id, creditCost, userProfile.credits);
     }
 
     res.json({ ok: true, reply, products: widgetProducts || [] });
   } catch (e) {
     res.status(500).json({ error: e.message || 'internal error' });
+  }
+});
+
+// ==================== IMAGE STUDIO ROUTES ====================
+
+// Serve blockimagen static files under /studio
+app.use('/studio', express.static(path.join(__dirname, 'blockimagen', 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+  }
+}));
+
+// Route-specific JSON parser for large base64 image payloads
+const studioJsonParser = express.json({ limit: '200mb' });
+
+// Studio credit helper: check balance, deduct after success, return remaining
+async function studioCheckCredits(req, res, cost) {
+  let latestCredits = Number(req.user.profile.credits || 0);
+  try {
+    latestCredits = await getProfileCredits(req.user.id);
+    req.user.profile.credits = latestCredits;
+  } catch (err) {
+    console.warn(`[CREDITS] Failed to refresh credits before studio action for ${req.user.id}: ${err.message}`);
+  }
+
+  if (latestCredits < cost) {
+    res.status(402).json({ error: { message: `Insufficient credits. This action requires ${cost} credits. You have ${latestCredits}.` } });
+    return false;
+  }
+  return true;
+}
+async function studioDeductCredits(req, cost) {
+  return deductCredits(req.user.id, cost, req.user.profile.credits);
+}
+
+// Studio: Image Generation Proxy (10 credits)
+app.post('/api/studio/generate', requireAuth, studioJsonParser, async (req, res) => {
+  try {
+    const creditCost = 10;
+    if (!(await studioCheckCredits(req, res, creditCost))) return;
+
+    const { model, messages, seed } = req.body;
+    if (!model || !messages) return res.status(400).json({ error: { message: 'Missing required fields: model, messages' } });
+
+    const payload = { model, messages };
+    if (seed !== undefined && seed !== null) payload.seed = seed;
+
+    const response = await fetch(OPENROUTER_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Authorization': getStudioAuthHeader(req.user.profile.role), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const responseText = await response.text();
+    let data;
+    try { data = JSON.parse(responseText); }
+    catch { return res.status(502).json({ error: { message: `OpenRouter returned invalid response (HTTP ${response.status}).` } }); }
+
+    if (!response.ok) return res.status(response.status).json(data);
+
+    const creditsRemaining = await studioDeductCredits(req, creditCost);
+    data.creditsUsed = creditCost;
+    data.creditsRemaining = creditsRemaining;
+    return res.json(data);
+  } catch (error) {
+    console.error('Studio generate error:', error);
+    return res.status(500).json({ error: { message: error.message || 'Internal server error during image generation.' } });
+  }
+});
+
+// Studio: Image Analysis Proxy — Recreate feature (5 credits)
+app.post('/api/studio/analyze', requireAuth, studioJsonParser, async (req, res) => {
+  try {
+    const creditCost = 5;
+    if (!(await studioCheckCredits(req, res, creditCost))) return;
+
+    const { model, messages, max_tokens, temperature } = req.body;
+    if (!model || !messages) return res.status(400).json({ error: { message: 'Missing required fields: model, messages' } });
+
+    const payload = { model, messages };
+    if (max_tokens !== undefined) payload.max_tokens = max_tokens;
+    if (temperature !== undefined) payload.temperature = temperature;
+
+    const response = await fetch(OPENROUTER_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Authorization': getStudioAuthHeader(req.user.profile.role), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json(data);
+
+    const creditsRemaining = await studioDeductCredits(req, creditCost);
+    data.creditsUsed = creditCost;
+    data.creditsRemaining = creditsRemaining;
+    return res.json(data);
+  } catch (error) {
+    console.error('Studio analyze error:', error.message);
+    return res.status(500).json({ error: { message: 'Internal server error during analysis.' } });
+  }
+});
+
+app.get('/api/studio/media', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('videos')
+      .select('*')
+      .like('task_id', `${req.user.id}:%`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: { message: error.message || 'Failed to load studio media.' } });
+    }
+
+    return res.json({ media: (data || []).map(normalizeStudioMediaRecord) });
+  } catch (error) {
+    console.error('Studio media list error:', error);
+    return res.status(500).json({ error: { message: error.message || 'Failed to load studio media.' } });
+  }
+});
+
+app.post('/api/studio/media', requireAuth, studioJsonParser, async (req, res) => {
+  try {
+    const {
+      mediaType = 'image',
+      dataUrl,
+      sourceUrl,
+      taskId,
+      promptText,
+      modelName,
+      aspectRatio,
+      sourceFeature
+    } = req.body || {};
+
+    if (mediaType !== 'image' && mediaType !== 'video') {
+      return res.status(400).json({ error: { message: 'Unsupported mediaType. Use image or video.' } });
+    }
+
+    let buffer;
+    let contentType;
+    let fileExtension;
+
+    if (mediaType === 'image') {
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        return res.status(400).json({ error: { message: 'Missing image dataUrl.' } });
+      }
+
+      const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!match) {
+        return res.status(400).json({ error: { message: 'Invalid image data URL.' } });
+      }
+
+      contentType = match[1];
+      buffer = Buffer.from(match[2], 'base64');
+      fileExtension = contentType.split('/')[1] || 'png';
+    } else {
+      if (!sourceUrl || typeof sourceUrl !== 'string') {
+        return res.status(400).json({ error: { message: 'Missing video sourceUrl.' } });
+      }
+
+      const fileResponse = await fetch(sourceUrl);
+      if (!fileResponse.ok) {
+        throw new Error(`Failed to fetch generated video: ${fileResponse.status} ${fileResponse.statusText}`);
+      }
+
+      const arrayBuffer = await fileResponse.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      contentType = fileResponse.headers.get('content-type') || 'video/mp4';
+      fileExtension = contentType.includes('webm') ? 'webm' : 'mp4';
+    }
+
+    const media = await saveStudioMediaRecord({
+      userId: req.user.id,
+      mediaType,
+      buffer,
+      contentType,
+      promptText,
+      modelName,
+      aspectRatio,
+      sourceFeature,
+      originalTaskId: taskId,
+      fileExtension
+    });
+
+    return res.json({ success: true, media });
+  } catch (error) {
+    console.error('Studio media save error:', error);
+    return res.status(500).json({ error: { message: error.message || 'Failed to save generated media.' } });
+  }
+});
+
+app.delete('/api/studio/media/:id', requireAuth, async (req, res) => {
+  try {
+    const { data: row, error } = await supabase
+      .from('videos')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !row || !String(row.task_id || '').startsWith(`${req.user.id}:`)) {
+      return res.status(404).json({ error: { message: 'Media not found.' } });
+    }
+
+    const storagePath = inferStudioMediaPathFromUrl(row.video_url);
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from(STUDIO_MEDIA_BUCKET).remove([storagePath]);
+      if (storageError) {
+        console.warn('Studio media storage delete warning:', storageError.message);
+      }
+    }
+
+    const { error: deleteError } = await supabase.from('videos').delete().eq('id', req.params.id);
+    if (deleteError) {
+      return res.status(500).json({ error: { message: deleteError.message || 'Failed to delete media.' } });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Studio media delete error:', error);
+    return res.status(500).json({ error: { message: error.message || 'Failed to delete media.' } });
+  }
+});
+
+// Studio: Kling AI Video Generation Proxy (50 credits for 5s, 100 credits for 10s)
+app.post('/api/studio/kling/generate', requireAuth, studioJsonParser, async (req, res) => {
+  try {
+    const { model_name, prompt, image, image_tail, duration, mode, aspect_ratio, type = 'image2video' } = req.body;
+    if (!model_name) return res.status(400).json({ error: { message: 'Missing model_name' } });
+
+    const creditCost = (String(duration) === '10') ? 100 : 50;
+    if (!(await studioCheckCredits(req, res, creditCost))) return;
+
+    const token = generateKlingToken();
+    const usesOmniEndpoint = model_name === 'kling-v3-omni' || model_name === 'kling-video-o1';
+    const endpoint = usesOmniEndpoint ? '/v1/videos/omni-video' : `/v1/videos/${type}`;
+    const url = `https://api-singapore.klingai.com${endpoint}`;
+
+    const stripBase64Prefix = (dataStr) => dataStr && dataStr.includes(',') ? dataStr.split(',')[1] : dataStr;
+
+    const payload = { model_name };
+    if (prompt) payload.prompt = prompt;
+    if (image) payload.image = stripBase64Prefix(image);
+    if (image_tail) payload.image_tail = stripBase64Prefix(image_tail);
+    if (duration) payload.duration = duration;
+    if (mode) payload.mode = mode;
+    if (aspect_ratio && (!image || usesOmniEndpoint)) payload.aspect_ratio = aspect_ratio;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 401) { cachedKlingToken = null; klingTokenExpiration = 0; }
+      return res.status(response.status).json(data);
+    }
+
+    const creditsRemaining = await studioDeductCredits(req, creditCost);
+    data.creditsUsed = creditCost;
+    data.creditsRemaining = creditsRemaining;
+    return res.json(data);
+  } catch (error) {
+    console.error('Studio kling generate error:', error);
+    return res.status(500).json({ error: { message: error.message || 'Internal server error during video generation.' } });
+  }
+});
+
+// Studio: Kling AI Task Status
+app.get('/api/studio/kling/task/:taskId', requireAuth, async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { type = 'image2video', model_name } = req.query;
+
+    const usesOmniEndpoint = model_name === 'kling-v3-omni' || model_name === 'kling-video-o1';
+    const endpoint = usesOmniEndpoint ? `/v1/videos/omni-video/${taskId}` : `/v1/videos/${type}/${taskId}`;
+    const token = generateKlingToken();
+    const url = `https://api-singapore.klingai.com${endpoint}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+    });
+
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json(data);
+    return res.json(data);
+  } catch (error) {
+    console.error('Studio kling task error:', error);
+    return res.status(500).json({ error: { message: error.message || 'Internal server error fetching task status.' } });
+  }
+});
+
+// Studio: Save Generated Video to Supabase Storage + Metadata
+app.post('/api/studio/save-video', requireAuth, async (req, res) => {
+  try {
+    const { videoUrl, taskId, promptText, modelName, aspectRatio, sourceFeature = 'video' } = req.body;
+    if (!videoUrl || !taskId) return res.status(400).json({ error: { message: 'Missing videoUrl or taskId' } });
+
+    const videoResponse = await fetch(videoUrl);
+    if (!videoResponse.ok) throw new Error(`Failed to fetch video: ${videoResponse.statusText}`);
+
+    const arrayBuffer = await videoResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = videoResponse.headers.get('content-type') || 'video/mp4';
+
+    const media = await saveStudioMediaRecord({
+      userId: req.user.id,
+      mediaType: 'video',
+      buffer,
+      contentType,
+      promptText,
+      modelName,
+      aspectRatio,
+      sourceFeature,
+      originalTaskId: taskId,
+      fileExtension: contentType.includes('webm') ? 'webm' : 'mp4'
+    });
+
+    return res.json({ success: true, filePath: media.src, media });
+  } catch (error) {
+    console.error('Studio save-video error:', error);
+    return res.status(500).json({ error: { message: error.message || 'Internal server error saving video.' } });
   }
 });
 
@@ -1531,7 +2040,7 @@ async function checkDailyLimit(profileId, role) {
   try {
     const { data, error } = await supabase.rpc('check_daily_limit', {
       p_profile_id: profileId,
-      p_role: role || 'FREE'
+      p_role: getPlanRole(role)
     });
     if (error) {
       console.error('Daily limit RPC error:', error);
@@ -1637,12 +2146,12 @@ async function processMessage(event, fbPageId) {
     }
     // -----------------------------------
     const creditCost = ['openai/gpt-oss-120b', 'google/gemini-2.5-flash-lite', 'google/gemini-3-flash-preview', 'openai/gpt-5-nano'].includes(page.ai_model) ? 2 : 1;
-    if (userProfile && userProfile.role !== 'ADMIN' && (userProfile.credits || 0) < creditCost) {
+    if (userProfile && !isAdminRole(userProfile.role) && (userProfile.credits || 0) < creditCost) {
       debugLog(`[DEBUG] User ${userProfile.email} out of credits.`);
       return;
     }
 
-    const canReply = await checkDailyLimit(page.profile_id, userProfile?.role || 'FREE');
+    const canReply = await checkDailyLimit(page.profile_id, userProfile?.role);
     if (!canReply) {
       debugLog(`[DEBUG] User ${userProfile?.email} reached their daily limit.`);
       return;
@@ -1981,14 +2490,8 @@ async function processMessage(event, fbPageId) {
       ])
     ]);
 
-    if (userProfile && userProfile.role !== 'ADMIN') {
-      try {
-        await supabase.rpc('deduct_credits', { user_id: page.profile_id, amount: creditCost }).single();
-      } catch (_rpcErr) {
-        // Fallback if RPC function not yet created in Supabase
-        const newCredits = Math.max(0, (userProfile.credits || 0) - creditCost);
-        await supabase.from('profiles').update({ credits: newCredits }).eq('id', page.profile_id);
-      }
+    if (userProfile && !isAdminRole(userProfile.role)) {
+      userProfile.credits = await deductCredits(page.profile_id, creditCost, userProfile.credits);
     }
 
   } catch (err) {
@@ -2119,7 +2622,26 @@ app.use((err, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', () => console.log(`BLOCKSCOM SAAS live on ${PORT}`));
+  const server = app.listen(PORT, '0.0.0.0', () => console.log(`BLOCKSCOM SAAS live on ${PORT}`));
+
+  const shutdown = (signal) => {
+    console.log(`${signal} received. Shutting down Blockscom server...`);
+    server.close((err) => {
+      if (err) {
+        console.error('Graceful shutdown failed:', err);
+        process.exit(1);
+      }
+      process.exit(0);
+    });
+
+    setTimeout(() => {
+      console.error('Forced shutdown after timeout.');
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
 module.exports = app;

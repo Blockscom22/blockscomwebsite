@@ -1,0 +1,21 @@
+[Unit]
+Description=Blockscom Website API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=www-data
+WorkingDirectory=/var/www/blockscomwebsite
+Environment=NODE_ENV=production
+Environment=PORT=10000
+Environment=TRUST_PROXY=1
+EnvironmentFile=/etc/blockscomwebsite.env
+ExecStart=/usr/bin/node /var/www/blockscomwebsite/server.js
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

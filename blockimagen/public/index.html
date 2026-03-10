@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-[#09090b] text-white overflow-x-hidden antialiased">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blockscom Image & Video Generation</title>
+
+  <!-- Favicon -->
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2309090b'/%3E%3Cpath d='M18 14h16c9.389 0 16 4.817 16 12 0 5.515-3.838 9.66-9.535 10.898C47.27 38.41 52 43.036 52 50c0 8.487-7.131 14-18 14H18V14zm12 20c5.65 0 9-2.599 9-6.5S35.65 21 30 21h-4v13h4zm2 22c7.041 0 11-2.914 11-7.5S39.041 41 32 41h-6v15h6z' fill='white'/%3E%3C/svg%3E"
+    type="image/svg+xml">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- GSAP & Lenis -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/studio-freight/lenis@1.0.29/bundled/lenis.min.js"></script>
+
+  <!-- Original Styles (Modified) -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              black: '#09090b',
+              dark: '#121216',
+              gray: '#1c1c21',
+              accent: '#FFFFFF',
+              dim: '#888888'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Space Grotesk', 'monospace'],
+          },
+          backgroundImage: {
+            'grid-pattern': "linear-gradient(to right, #1f1f1f 1px, transparent 1px), linear-gradient(to bottom, #1f1f1f 1px, transparent 1px)",
+          }
+        }
+      }
+    }
+  </script>
+</head>
+
+<body class="selection:bg-white selection:text-black">
+
+  <div class="glow-sphere"></div>
+  <!-- Noise Overlay -->
+  <div class="noise-bg"></div>
+
+  <!-- Scroll Progress -->
+  <div class="progress-bar"></div>
+
+  <main class="w-full relative min-h-screen pt-20 pb-40 px-4 md:px-8">
+    <!-- Background Grid -->
+    <div class="absolute inset-0 opacity-[0.03] bg-grid-pattern grid-bg pointer-events-none fixed"></div>
+
+    <div class="studio-shell max-w-[1600px] mx-auto relative z-10 flex flex-col gap-6">
+
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <!-- HEADER: Title Row + Feature Tabs Row                          -->
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <div class="flex flex-col gap-4 pb-4 border-b border-white/5">
+        <!-- Top Row: Status + Surprise Me -->
+        <div class="flex flex-wrap justify-between items-center gap-4">
+          <div class="flex flex-wrap items-center gap-3 text-xs font-mono text-gray-400">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span id="status">Ready</span>
+            </div>
+            <div class="px-3 py-1 rounded-full border border-white/10 bg-white/5 flex items-center gap-2">
+              <span class="text-gray-500">Credits</span>
+              <span id="credit-balance" class="text-white">Syncing...</span>
+            </div>
+          </div>
+          <button
+            class="px-4 py-2 border border-blue-500/30 text-blue-400 bg-blue-500/10 rounded-full text-xs hover:bg-blue-500/20 transition-all hover-trigger whitespace-nowrap flex items-center gap-2"
+            type="button" id="surprise-btn" data-cursor="link">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Surprise Me
+          </button>
+        </div>
+
+        <!-- Feature Tabs: Horizontal Pill Bar (Always Visible) -->
+        <div class="flex items-center gap-2" id="feature-tabs">
+          <button type="button" class="tab-btn active" data-feature-tab="generate">
+            <i data-lucide="wand-2" class="w-3.5 h-3.5"></i> Generate
+          </button>
+          <button type="button" class="tab-btn" data-feature-tab="recreate">
+            <i data-lucide="scan" class="w-3.5 h-3.5"></i> Recreate
+          </button>
+          <button type="button" class="tab-btn" data-feature-tab="product">
+            <i data-lucide="box" class="w-3.5 h-3.5"></i> Product
+          </button>
+          <button type="button" class="tab-btn" data-feature-tab="video">
+            <i data-lucide="clapperboard" class="w-3.5 h-3.5"></i> Video
+          </button>
+        </div>
+        <div class="text-[10px] font-mono uppercase tracking-[0.24em] text-gray-500">
+          Uses your Blockscom login and shared credits for image and video generation.
+        </div>
+      </div>
+
+
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <!-- MAIN GRID: Sidebar + Gallery                                  -->
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <div class="studio-grid grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        <!-- ─── Left Sidebar: Settings (Col 3) ─── -->
+        <div class="studio-sidebar lg:col-span-3 flex flex-col gap-4 lg:sticky lg:top-28 h-fit z-20">
+          <section class="glass-panel p-5 rounded-2xl border border-white/10 bg-[#121216]/80 backdrop-blur-xl">
+            <form id="generator-form" class="form flex flex-col gap-4">
+
+              <!-- ═══ GENERATE TAB PANEL ═══ -->
+              <div class="tab-panel" data-feature-panel="generate">
+
+                <!-- ── Section: Image Inputs ── -->
+                <div class="settings-section" data-section="images">
+                  <button type="button" class="settings-section-header" data-toggle-section="images">
+                    <span class="text-xs font-mono font-bold uppercase text-gray-500 flex items-center gap-2">
+                      <i data-lucide="image-plus" class="w-3.5 h-3.5"></i> Image Inputs
+                    </span>
+                    <i data-lucide="chevron-down"
+                      class="w-3.5 h-3.5 text-gray-600 section-chevron transition-transform"></i>
+                  </button>
+                  <div class="settings-section-body">
+                    <div class="flex flex-col gap-3">
+                      <!-- Reference Images -->
+                      <div class="field">
+                        <label
+                          class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                          <span>Reference (Max 4)</span>
+                          <button type="button"
+                            class="history-btn text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 normal-case tracking-normal"
+                            data-target="reference">
+                            <i data-lucide="clock" class="w-3 h-3"></i> Recent
+                          </button>
+                        </label>
+                        <div
+                          class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer"
+                          id="drop-reference">
+                          <input type="file" id="reference-images" accept="image/*" multiple
+                            class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                          <i data-lucide="images"
+                            class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                          <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop Images</span>
+                          <div class="preview-grid hidden w-full grid-cols-4 gap-1 mt-1 relative z-20"
+                            id="reference-preview">
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Character Images -->
+                      <div class="field">
+                        <label
+                          class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                          <span>Character (Max 6)</span>
+                          <button type="button"
+                            class="history-btn text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 normal-case tracking-normal"
+                            data-target="character">
+                            <i data-lucide="clock" class="w-3 h-3"></i> Recent
+                          </button>
+                        </label>
+                        <div
+                          class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer"
+                          id="drop-character">
+                          <input type="file" id="character-images" accept="image/*" multiple
+                            class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                          <i data-lucide="users"
+                            class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                          <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop Images</span>
+                          <div class="preview-grid hidden w-full grid-cols-3 gap-1 mt-1 relative z-20"
+                            id="character-preview">
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <!-- Scene -->
+                        <div class="field">
+                          <label
+                            class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                            <span>Scene</span>
+                            <button type="button"
+                              class="history-btn text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 normal-case tracking-normal"
+                              data-target="scene">
+                              <i data-lucide="clock" class="w-3 h-3"></i> Recent
+                            </button>
+                          </label>
+                          <div
+                            class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer aspect-square"
+                            id="drop-scene">
+                            <input type="file" id="scene-image" accept="image/*"
+                              class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                            <i data-lucide="image"
+                              class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                            <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop</span>
+                            <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                              id="scene-preview">
+                            </div>
+                          </div>
+                        </div>
+                        <!-- Style -->
+                        <div class="field">
+                          <label
+                            class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                            <span>Style</span>
+                            <button type="button"
+                              class="history-btn text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 normal-case tracking-normal"
+                              data-target="style">
+                              <i data-lucide="clock" class="w-3 h-3"></i> Recent
+                            </button>
+                          </label>
+                          <div
+                            class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer aspect-square"
+                            id="drop-style">
+                            <input type="file" id="style-image" accept="image/*"
+                              class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                            <i data-lucide="palette"
+                              class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                            <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop</span>
+                            <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                              id="style-preview">
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── Section: Style Options (Collapsed by Default) ── -->
+                <div class="settings-section collapsed" data-section="style-options">
+                  <button type="button" class="settings-section-header" data-toggle-section="style-options">
+                    <span class="text-xs font-mono font-bold uppercase text-gray-500 flex items-center gap-2">
+                      <i data-lucide="paintbrush" class="w-3.5 h-3.5"></i> Style Options
+                    </span>
+                    <i data-lucide="chevron-down"
+                      class="w-3.5 h-3.5 text-gray-600 section-chevron transition-transform"></i>
+                  </button>
+                  <div class="settings-section-body">
+                    <!-- Tags -->
+                    <div class="field">
+                      <label class="text-[10px] font-mono text-gray-500 uppercase mb-2 block">Style Tags</label>
+                      <div class="flex flex-wrap gap-1.5" id="style-tags">
+                        <label class="chip cursor-pointer select-none">
+                          <input type="checkbox" value="cinematic lighting" class="hidden peer">
+                          <span
+                            class="px-2.5 py-1 border border-white/10 rounded-full text-[10px] text-gray-400 peer-checked:bg-white peer-checked:text-black peer-checked:border-white transition-all hover:border-white/40">Cinematic</span>
+                        </label>
+                        <label class="chip cursor-pointer select-none">
+                          <input type="checkbox" value="soft grain" class="hidden peer">
+                          <span
+                            class="px-2.5 py-1 border border-white/10 rounded-full text-[10px] text-gray-400 peer-checked:bg-white peer-checked:text-black peer-checked:border-white transition-all hover:border-white/40">Grain</span>
+                        </label>
+                        <label class="chip cursor-pointer select-none">
+                          <input type="checkbox" value="ultra detailed" class="hidden peer">
+                          <span
+                            class="px-2.5 py-1 border border-white/10 rounded-full text-[10px] text-gray-400 peer-checked:bg-white peer-checked:text-black peer-checked:border-white transition-all hover:border-white/40">Detailed</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-3">
+                      <select id="palette"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[10px] focus:outline-none text-gray-400">
+                        <option value="">Palette...</option>
+                        <option value="ember and teal">Ember/Teal</option>
+                        <option value="sunset clay">Sunset</option>
+                        <option value="cobalt and cream">Cobalt</option>
+                      </select>
+                      <select id="mood"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[10px] focus:outline-none text-gray-400">
+                        <option value="">Mood...</option>
+                        <option value="moody">Moody</option>
+                        <option value="bright">Bright</option>
+                        <option value="minimal">Minimal</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ RECREATE TAB PANEL ═══ -->
+              <div class="tab-panel hidden" data-feature-panel="recreate">
+                <div class="flex flex-col gap-3">
+                  <div class="field">
+                    <label
+                      class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                      <span>Reference Image</span>
+                      <button type="button"
+                        class="history-btn text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 normal-case tracking-normal"
+                        data-target="recreate-reference">
+                        <i data-lucide="clock" class="w-3 h-3"></i> Recent
+                      </button>
+                    </label>
+                    <div
+                      class="drop-zone relative border border-dashed border-white/10 rounded-xl bg-white/5 hover:bg-white/10 transition-colors p-3 min-h-[140px] flex flex-col items-center justify-center gap-1.5 text-center group cursor-pointer"
+                      id="drop-recreate-reference">
+                      <input type="file" id="recreate-reference" accept="image/*"
+                        class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                      <i data-lucide="scan" class="w-4 h-4 text-gray-600 group-hover:text-white transition-colors"></i>
+                      <span class="text-[10px] text-gray-500 group-hover:text-gray-300">Drop Image</span>
+                      <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                        id="recreate-reference-preview"></div>
+                    </div>
+                  </div>
+
+                  <button
+                    class="w-full px-4 py-2.5 border border-white/15 rounded-xl text-[11px] font-mono uppercase tracking-widest text-gray-300 hover:bg-white hover:text-black transition-colors"
+                    type="button" id="recreate-analyze">
+                    Analyze Image
+                  </button>
+
+                  <div id="recreate-status" class="text-[10px] font-mono text-gray-500 h-4"></div>
+
+                  <div class="field">
+                    <label for="recreate-model-select"
+                      class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Model</label>
+                    <select id="recreate-model-select"
+                      class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] focus:outline-none text-gray-300 appearance-none">
+                      <option value="google/gemini-3.1-flash-image-preview">Nano Banana 2</option>
+                      <option value="google/gemini-3-pro-image-preview">Nano Banana Pro</option>
+                      <option value="google/gemini-2.5-flash-image">Nano Banana</option>
+                      <option value="openai/gpt-5-image">GPT-5 Image</option>
+                      <option value="openai/gpt-5-image-mini">GPT-5 Mini</option>
+                    </select>
+                  </div>
+
+                  <div class="field">
+                    <label class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Global Edits</label>
+                    <textarea id="recreate-notes" rows="3" placeholder="Optional global changes..."
+                      class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[11px] focus:outline-none text-gray-300 resize-none"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ PRODUCT TAB PANEL ═══ -->
+              <div class="tab-panel hidden" data-feature-panel="product">
+                <div class="flex flex-col gap-4">
+                  <div class="field">
+                    <label
+                      class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                      <span>Product References (Up to 6 Images)</span>
+                      <button type="button"
+                        class="history-btn text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 normal-case tracking-normal"
+                        data-target="product-reference">
+                        <i data-lucide="clock" class="w-3 h-3"></i> Recent
+                      </button>
+                    </label>
+                    <div
+                      class="drop-zone relative border border-dashed text-blue-400 border-blue-400/30 rounded-xl bg-blue-500/5 hover:bg-blue-500/10 transition-colors p-4 flex flex-col items-center justify-center gap-2 text-center group cursor-pointer aspect-video"
+                      id="drop-product-reference">
+                      <input type="file" id="product-reference" accept="image/*" multiple
+                        class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                      <i data-lucide="scan-line"
+                        class="w-6 h-6 text-blue-500/70 group-hover:text-blue-400 transition-colors"></i>
+                      <span class="text-[10px] text-blue-500/70 group-hover:text-blue-400 font-mono tracking-wide">Drop
+                        Product Images</span>
+                      <div class="preview-grid absolute inset-0 rounded-xl overflow-hidden hidden z-20 p-2 grid-cols-3 gap-2"
+                        id="product-reference-preview"></div>
+                    </div>
+                    <p class="text-[10px] leading-relaxed text-gray-500 mt-2">
+                      Upload every product you want featured together: shirt, slippers, bag, watch, and more. The AI
+                      will analyze all uploaded products first, then build prompts that keep the full bundle consistent.
+                    </p>
+                  </div>
+
+                  <!-- Optional Character Reference -->
+                  <div class="field">
+                    <label
+                      class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                      <span>Character Reference (Optional UGC Image)</span>
+                      <button type="button"
+                        class="history-btn text-pink-400 hover:text-pink-300 transition-colors flex items-center gap-1 normal-case tracking-normal"
+                        data-target="product-character">
+                        <i data-lucide="clock" class="w-3 h-3"></i> Recent
+                      </button>
+                    </label>
+                    <div
+                      class="drop-zone relative border border-dashed text-pink-400 border-pink-400/30 rounded-xl bg-pink-500/5 hover:bg-pink-500/10 transition-colors p-4 flex flex-col items-center justify-center gap-2 text-center group cursor-pointer aspect-video"
+                      id="drop-product-character">
+                      <input type="file" id="product-character" accept="image/*"
+                        class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                      <i data-lucide="user"
+                        class="w-6 h-6 text-pink-500/70 group-hover:text-pink-400 transition-colors"></i>
+                      <span class="text-[10px] text-pink-500/70 group-hover:text-pink-400 font-mono tracking-wide">Drop
+                        Character Image</span>
+                      <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                        id="product-character-preview"></div>
+                    </div>
+                  </div>
+                  <button id="product-analyze" type="button" disabled
+                    class="w-full py-3 rounded-xl bg-blue-500 text-white text-[10px] font-mono uppercase tracking-widest hover:bg-blue-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    <i data-lucide="wand-2" class="w-4 h-4"></i> Generate Prompts
+                  </button>
+                  <div id="product-analysis-summary"
+                    class="hidden p-3 rounded-xl border border-white/10 bg-white/5 text-left">
+                    <p class="text-[9px] font-mono text-blue-400 uppercase tracking-widest mb-1.5">Analysis Snapshot
+                    </p>
+                    <p id="product-analysis-text" class="text-[11px] text-gray-300 leading-relaxed"></p>
+                  </div>
+                  <div id="product-suggestions-container" class="hidden flex-col gap-2 mt-2">
+                    <button type="button" id="product-view-prompts"
+                      class="w-full py-2.5 rounded-xl border border-white/10 text-gray-300 text-[10px] font-mono uppercase tracking-widest hover:bg-white/5 hover:border-white/20 transition-colors flex items-center justify-center gap-2">
+                      <i data-lucide="list" class="w-3.5 h-3.5"></i> View AI Prompts
+                    </button>
+
+                    <!-- Selected Prompt Preview -->
+                    <div id="product-selected-prompt"
+                      class="hidden mt-1 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                      <p class="text-[9px] font-mono text-blue-400 uppercase tracking-widest mb-1.5">Selected Prompt</p>
+                      <p id="product-selected-text" class="text-[11px] text-blue-200 leading-relaxed line-clamp-3"></p>
+                      <div id="product-selected-video-container">
+                        <p
+                          class="text-[9px] font-mono text-pink-400 uppercase tracking-widest mt-2 mb-1 flex items-center gap-1.5">
+                          <i data-lucide="video" class="w-2.5 h-2.5"></i> Video Prompt
+                        </p>
+                        <p id="product-selected-video"
+                          class="text-[10px] text-pink-200 leading-relaxed line-clamp-3 select-all"></p>
+                      </div>
+                    </div>
+
+                    <!-- Copy JSON Button -->
+                    <button id="product-copy-json-sidebar" type="button"
+                      class="hidden w-full py-2.5 rounded-xl border border-white/10 text-gray-300 text-[10px] font-mono uppercase tracking-widest hover:bg-white/5 hover:border-white/20 transition-colors items-center justify-center gap-2 mt-1">
+                      <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy JSON Prompts
+                    </button>
+
+                    <!-- Generate Button -->
+                    <button id="product-generate" type="button" disabled
+                      class="w-full py-3 rounded-xl bg-white text-black text-[10px] font-mono uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1">
+                      <i data-lucide="sparkles" class="w-4 h-4"></i> Generate Image
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══ VIDEO TAB PANEL ═══ -->
+              <div class="tab-panel hidden" data-feature-panel="video">
+                <div class="flex flex-col gap-4">
+                  <div class="field">
+                    <label
+                      class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                      <span>Start Frame (Required)</span>
+                    </label>
+                    <div
+                      class="drop-zone relative border border-dashed text-purple-400 border-purple-400/30 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors p-4 flex flex-col items-center justify-center gap-2 text-center group cursor-pointer aspect-video"
+                      id="drop-video-start">
+                      <input type="file" id="video-start" accept="image/*"
+                        class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                      <i data-lucide="image-play"
+                        class="w-6 h-6 text-purple-500/70 group-hover:text-purple-400 transition-colors"></i>
+                      <span
+                        class="text-[10px] text-purple-500/70 group-hover:text-purple-400 font-mono tracking-wide">Drop
+                        Start Frame</span>
+                      <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                        id="video-start-preview"></div>
+                    </div>
+                  </div>
+
+                  <div class="field">
+                    <label
+                      class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex justify-between items-center">
+                      <span>End Frame (Optional)</span>
+                    </label>
+                    <div
+                      class="drop-zone relative border border-dashed text-purple-400 border-purple-400/30 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors p-4 flex flex-col items-center justify-center gap-2 text-center group cursor-pointer aspect-video"
+                      id="drop-video-end">
+                      <input type="file" id="video-end" accept="image/*"
+                        class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                      <i data-lucide="image-down"
+                        class="w-6 h-6 text-purple-500/70 group-hover:text-purple-400 transition-colors"></i>
+                      <span
+                        class="text-[10px] text-purple-500/70 group-hover:text-purple-400 font-mono tracking-wide">Drop
+                        End Frame</span>
+                      <div class="preview-single absolute inset-0 rounded-xl overflow-hidden hidden z-20"
+                        id="video-end-preview"></div>
+                    </div>
+                  </div>
+
+                  <!-- Models & Aspect -->
+                  <div class="flex flex-col gap-3 border-t border-white/5 pt-3">
+                    <div class="flex flex-col sm:flex-row gap-2">
+                      <div class="field flex-1">
+                        <label for="video-model"
+                          class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Kling Model</label>
+                        <select id="video-model"
+                          class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2.5 text-[11px] focus:outline-none text-gray-300 appearance-none font-mono uppercase tracking-wide">
+                          <option value="kling-v1">Kling v1</option>
+                          <option value="kling-v1-5">Kling v1.5</option>
+                          <option value="kling-v1-6">Kling v1.6</option>
+                          <option value="kling-v2-master">Kling v2 Master</option>
+                          <option value="kling-v2-1">Kling v2.1</option>
+                          <option value="kling-v2-1-master">Kling v2.1 Master</option>
+                          <option value="kling-v2-5-turbo">Kling v2.5 Turbo</option>
+                          <option value="kling-v2-6" selected>Kling v2.6</option>
+                          <option value="kling-v3">Kling v3</option>
+                          <option value="kling-video-o1">Kling Video o1</option>
+                          <option value="kling-v3-omni">Kling v3 Omni</option>
+                        </select>
+                      </div>
+
+                      <div class="field w-full sm:w-24">
+                        <label for="video-duration"
+                          class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Duration</label>
+                        <select id="video-duration"
+                          class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2.5 text-[11px] focus:outline-none text-gray-300 appearance-none font-mono uppercase tracking-wide">
+                          <option value="3">3 Seconds</option>
+                          <option value="5" selected>5 Seconds</option>
+                          <option value="10">10 Seconds</option>
+                          <option value="15">15 Seconds</option>
+                        </select>
+                      </div>
+
+                      <div class="field w-full sm:w-28">
+                        <label for="video-aspect"
+                          class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 block">Orientation</label>
+                        <select id="video-aspect"
+                          class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2.5 text-[11px] focus:outline-none text-gray-300 appearance-none font-mono uppercase tracking-wide">
+                          <option value="16:9" selected>Landscape</option>
+                          <option value="9:16">Portrait</option>
+                          <option value="1:1">Square</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="field">
+                      <label for="video-prompt"
+                        class="text-[10px] font-mono text-gray-500 uppercase mb-1.5 flex items-center justify-between gap-2">
+                        <span>Motion Prompt</span>
+                        <button id="video-ai-generate" type="button"
+                          class="px-2.5 py-1.5 rounded-lg border border-purple-400/30 text-purple-300 text-[9px] font-mono uppercase tracking-widest hover:bg-purple-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+                          <i data-lucide="sparkles" class="w-3 h-3"></i> Generate Prompt Using AI
+                        </button>
+                      </label>
+                      <p class="text-[10px] leading-relaxed text-gray-500 mb-2">
+                        Upload a start frame first. Add an end frame to let AI build a stronger transition-aware viral motion prompt.
+                      </p>
+                      <textarea id="video-prompt" rows="3" placeholder="Describe the motion or scene..."
+                        class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-[11px] focus:outline-none text-gray-300 resize-none font-sans"></textarea>
+                      <div id="video-ai-plan"
+                        class="hidden mt-2 p-3 rounded-xl border border-purple-500/20 bg-purple-500/10 text-left">
+                        <div class="flex items-center justify-between gap-2 mb-1.5">
+                          <p class="text-[9px] font-mono text-purple-300 uppercase tracking-widest">AI Video Direction</p>
+                          <button id="video-copy-ai-json" type="button"
+                            class="hidden px-2 py-1 rounded-md border border-white/10 text-[9px] font-mono uppercase tracking-widest text-gray-300 hover:bg-white/5 transition-colors items-center gap-1">
+                            <i data-lucide="copy" class="w-3 h-3"></i> Copy JSON
+                          </button>
+                        </div>
+                        <p id="video-ai-summary" class="text-[11px] text-gray-300 leading-relaxed"></p>
+                        <p id="video-ai-effects" class="mt-2 text-[10px] text-purple-200 leading-relaxed"></p>
+                      </div>
+                    </div>
+
+                    <button id="video-generate" type="button"
+                      class="w-full py-3 rounded-xl bg-purple-500 text-white text-[10px] font-mono uppercase tracking-widest hover:bg-purple-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-1 shadow-lg shadow-purple-500/20">
+                      <i data-lucide="clapperboard" class="w-4 h-4"></i> Generate Video
+                    </button>
+                    <div id="video-status" class="text-[10px] font-mono text-purple-400 h-4 text-center select-all">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="h-px w-full bg-white/5"></div>
+
+              <!-- ── Section: Output Settings (Always Visible) ── -->
+              <div class="settings-section" data-section="output">
+                <button type="button" class="settings-section-header" data-toggle-section="output">
+                  <span class="text-xs font-mono font-bold uppercase text-gray-500 flex items-center gap-2">
+                    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i> Output
+                  </span>
+                  <i data-lucide="chevron-down"
+                    class="w-3.5 h-3.5 text-gray-600 section-chevron transition-transform"></i>
+                </button>
+                <div class="settings-section-body">
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="field">
+                      <label for="aspect"
+                        class="text-[10px] font-mono text-gray-500 uppercase mb-1 block">Aspect</label>
+                      <select id="aspect"
+                        class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] focus:outline-none text-gray-300 appearance-none">
+                        <option value="1:1">1:1 Square</option>
+                        <option value="16:9">16:9 Wide</option>
+                        <option value="9:16">9:16 Tall</option>
+                        <option value="reference">Reference</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="count" class="text-[10px] font-mono text-gray-500 uppercase mb-1 block">Count: <span
+                          id="count-value">1</span></label>
+                      <input type="range" id="count" min="1" max="4" value="1"
+                        class="w-full accent-white h-1 bg-white/20 rounded-lg appearance-none cursor-pointer mt-1.5">
+                    </div>
+                  </div>
+                  <div class="field mt-3">
+                    <label for="seed" class="text-[10px] font-mono text-gray-500 uppercase mb-1 block">Seed</label>
+                    <input id="seed" type="number" placeholder="Random..."
+                      class="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[10px] focus:outline-none placeholder-gray-600 text-gray-300">
+                  </div>
+                </div>
+              </div>
+
+              <div class="error text-red-400 text-[10px] font-mono h-4 truncate" id="error"></div>
+
+              <!-- Reset Button (Prominent at bottom) -->
+              <button
+                class="w-full py-2 border border-white/10 rounded-xl text-[10px] font-mono uppercase tracking-widest text-gray-500 hover:text-white hover:border-white/30 transition-all"
+                type="button" id="clear">
+                <span class="flex items-center justify-center gap-2">
+                  <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset All
+                </span>
+              </button>
+            </form>
+          </section>
+        </div>
+
+        <!-- ─── Right: Gallery (Col 9) ─── -->
+        <div class="studio-gallery lg:col-span-9 flex flex-col h-full">
+
+          <!-- Recreate Editor -->
+          <section id="recreate-editor"
+            class="hidden glass-panel p-5 rounded-2xl border border-white/10 bg-[#121216]/80 backdrop-blur-xl mb-6">
+            <div class="flex justify-between items-end border-b border-white/5 pb-4 mb-4">
+              <div>
+                <h2 class="text-xl font-light">Recreate Editor</h2>
+                <p id="recreate-summary" class="text-xs font-mono text-gray-500 mt-2">
+                  Analyze a reference image to list every element.
+                </p>
+              </div>
+              <div class="text-xs font-mono text-gray-500">
+                <span id="recreate-elements-count" class="text-white">0</span> elements
+              </div>
+            </div>
+            <div id="recreate-elements" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+            <div class="flex items-center gap-3 mt-5">
+              <button id="recreate-run" type="button"
+                class="px-5 py-2 rounded-full bg-white text-black text-xs font-mono uppercase tracking-widest hover:bg-gray-200 transition-colors">
+                Recreate Image
+              </button>
+            </div>
+          </section>
+
+          <!-- Gallery -->
+          <section class="gallery min-h-[600px] flex flex-col">
+            <!-- Gallery Header with Clear Button -->
+            <div class="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+              <div class="flex items-center gap-4">
+                <h2 id="gallery-title" class="text-xl font-light">Gallery</h2>
+                <span class="text-xs font-mono text-gray-500">
+                  <span id="image-count" class="text-white">0</span> results
+                </span>
+              </div>
+              <button type="button" id="clear-gallery"
+                class="text-[10px] font-mono uppercase tracking-widest text-gray-500 hover:text-white border border-white/10 hover:border-white/30 rounded-full px-3 py-1.5 transition-all flex items-center gap-1.5">
+                <i data-lucide="trash-2" class="w-3 h-3"></i> Clear
+              </button>
+            </div>
+
+            <div class="gallery-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="gallery-grid"></div>
+
+            <div
+              class="gallery-empty border border-dashed border-white/10 rounded-2xl p-12 text-center bg-white/5 flex flex-col items-center justify-center h-96"
+              id="gallery-empty">
+              <i data-lucide="aperture" class="w-12 h-12 text-gray-700 mb-4"></i>
+              <p id="gallery-empty-text" class="text-gray-500 mb-6 max-w-sm">Results will appear here. Try a sample
+                prompt to get started.</p>
+              <div class="flex flex-wrap justify-center gap-3">
+                <button
+                  class="sample px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 hover:bg-white hover:text-black transition-colors"
+                  type="button" data-prompt="A neon-lit sushi bar, cinematic lighting, soft grain">
+                  Neon sushi bar
+                </button>
+                <button
+                  class="sample px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 hover:bg-white hover:text-black transition-colors"
+                  type="button" data-prompt="A brutalist greenhouse in winter fog, wide angle">
+                  Brutalist greenhouse
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Image Editor Modal -->
+  <div id="editor-modal" class="editor-modal hidden" aria-hidden="true">
+    <div class="editor-backdrop" data-editor-close></div>
+    <div class="editor-panel" role="dialog" aria-modal="true" aria-label="Image editor">
+      <div class="editor-toolbar">
+        <div class="editor-color-pill" role="listbox" aria-label="Brush colors">
+          <button class="editor-color-btn active" type="button" data-color="#ff4d4d" aria-label="Red"></button>
+          <button class="editor-color-btn" type="button" data-color="#f7c948" aria-label="Yellow"></button>
+          <button class="editor-color-btn" type="button" data-color="#34d399" aria-label="Green"></button>
+          <button class="editor-color-btn" type="button" data-color="#60a5fa" aria-label="Blue"></button>
+          <button class="editor-color-btn" type="button" data-color="#ffffff" aria-label="White"></button>
+        </div>
+        <div class="editor-size-pill" role="group" aria-label="Brush size">
+          <input id="editor-brush-size" type="range" min="2" max="30" value="6" aria-label="Brush size">
+          <span id="editor-brush-label">6</span>
+        </div>
+        <div class="editor-tool-pill" role="group" aria-label="Tools">
+          <button id="tool-draw" class="editor-tool active" type="button" data-tool="draw" aria-label="Draw tool">
+            <i data-lucide="pencil" class="w-4 h-4"></i>
+          </button>
+          <button id="tool-text" class="editor-tool" type="button" data-tool="text" aria-label="Text tool">T</button>
+        </div>
+      </div>
+      <div class="editor-canvas-wrap">
+        <div id="editor-loading" class="editor-loading hidden">Loading image...</div>
+        <canvas id="editor-canvas"></canvas>
+        <input id="editor-text-input" class="editor-text-input hidden" type="text" placeholder="Type and press Enter">
+      </div>
+      <div class="editor-actions">
+        <button id="editor-reset" type="button">Reset</button>
+        <div class="editor-action-spacer"></div>
+        <button id="editor-cancel" type="button">Cancel</button>
+        <button id="editor-save" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Product Prompts Modal ═══ -->
+  <div id="product-prompts-modal" class="fixed inset-0 z-[10040] hidden" aria-hidden="true">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-md" id="product-modal-backdrop"></div>
+    <!-- Panel -->
+    <div class="relative z-10 flex items-center justify-center min-h-full p-4 sm:p-6">
+      <div
+        class="w-full max-w-2xl max-h-[90vh] bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between p-5 border-b border-white/5 shrink-0">
+          <div>
+            <h3 class="text-lg font-light text-white">AI Suggested Prompts</h3>
+            <p class="text-[10px] font-mono text-gray-500 mt-1">Click a prompt to select it, then generate</p>
+          </div>
+          <button type="button" id="product-modal-close"
+            class="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="product-modal-loading" class="flex-1 flex flex-col items-center justify-center gap-4 p-12">
+          <div class="w-10 h-10 border-2 border-white/20 border-t-blue-400 rounded-full animate-spin"></div>
+          <p class="text-sm font-mono text-gray-400 animate-pulse">Analyzing product...</p>
+          <p class="text-[10px] text-gray-600 font-mono">Generating ad-quality photoshoot prompts</p>
+        </div>
+
+        <!-- Results (hidden until loaded) -->
+        <div id="product-modal-results" class="hidden flex-1 flex flex-col overflow-hidden min-h-0">
+          <!-- Prompt List -->
+          <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-2 custom-scrollbar" id="product-modal-list">
+          </div>
+
+          <!-- Selected Prompt + Controls -->
+          <div class="shrink-0 border-t border-white/5 p-4 sm:p-5 bg-black/40 space-y-3">
+            <!-- Selected Preview -->
+            <div id="product-modal-selected" class="hidden p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+              <p class="text-[9px] font-mono text-blue-400 uppercase tracking-widest mb-1">Selected</p>
+              <p id="product-modal-selected-text" class="text-[11px] text-blue-200 leading-relaxed line-clamp-3"></p>
+              <div class="mt-2 pt-2 border-t border-blue-500/20" id="product-modal-video-container">
+                <p class="text-[9px] font-mono text-pink-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                  <i data-lucide="video" class="w-2.5 h-2.5"></i> Video Prompt (Copy Me!)
+                </p>
+                <p id="product-modal-selected-video"
+                  class="text-[11px] text-pink-200 leading-relaxed line-clamp-2 select-all cursor-text"></p>
+              </div>
+              <button id="product-copy-json-modal" type="button"
+                class="mt-3 w-full py-2 rounded-lg border border-white/10 text-gray-300 text-[10px] font-mono uppercase tracking-widest hover:bg-white/5 hover:border-white/20 transition-colors flex items-center justify-center gap-2">
+                <i data-lucide="copy" class="w-3 h-3"></i> Copy to Clipboard (JSON)
+              </button>
+            </div>
+
+            <!-- Model + Aspect + Generate -->
+            <div class="flex flex-col sm:flex-row gap-2">
+              <select id="product-modal-model"
+                class="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-[11px] focus:outline-none text-gray-300 appearance-none font-mono uppercase tracking-wide">
+                <option value="google/gemini-3.1-flash-image-preview">Nano Banana 2</option>
+                <option value="google/gemini-3-pro-image-preview">Nano Banana Pro</option>
+                <option value="google/gemini-2.5-flash-image">Nano Banana</option>
+                <option value="openai/gpt-5-image">GPT-5 Image</option>
+                <option value="openai/gpt-5-image-mini">GPT-5 Mini</option>
+              </select>
+              <select id="product-modal-aspect"
+                class="w-full sm:w-32 bg-black/30 border border-white/10 rounded-lg px-3 py-2.5 text-[11px] focus:outline-none text-gray-300 appearance-none font-mono uppercase tracking-wide">
+                <option value="16:9">Landscape</option>
+                <option value="9:16">Portrait</option>
+                <option value="1:1">Square</option>
+              </select>
+              <button id="product-modal-generate" type="button" disabled
+                class="px-6 py-2.5 rounded-xl bg-white text-black text-[11px] font-mono uppercase tracking-widest hover:bg-gray-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap">
+                <i data-lucide="sparkles" class="w-4 h-4"></i> Generate Image
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="product-modal-error" class="hidden flex-1 flex flex-col items-center justify-center gap-3 p-12">
+          <i data-lucide="alert-circle" class="w-10 h-10 text-red-400"></i>
+          <p id="product-modal-error-text" class="text-sm text-red-400 text-center"></p>
+          <button type="button" id="product-modal-retry"
+            class="mt-2 px-4 py-2 border border-white/10 rounded-full text-xs text-gray-400 hover:text-white hover:border-white/30 transition-colors">
+            Try Again
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Input Bar (Centered Bottom) -->
+  <div id="generate-bar" class="fixed bottom-0 left-0 w-full z-40 p-4 sm:p-6 pointer-events-none">
+    <div class="max-w-3xl mx-auto pointer-events-auto">
+      <div
+        class="glass-panel p-2 rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+
+        <!-- Custom Model Select (Upward Dropdown) -->
+        <div class="relative shrink-0" id="custom-model-wrapper">
+          <select id="model-select" form="generator-form" class="hidden">
+            <option value="google/gemini-3.1-flash-image-preview">Nano Banana 2</option>
+            <option value="google/gemini-3-pro-image-preview">Nano Banana Pro</option>
+            <option value="google/gemini-2.5-flash-image">Nano Banana</option>
+            <option value="openai/gpt-5-image">GPT-5 Image</option>
+            <option value="openai/gpt-5-image-mini">GPT-5 Mini</option>
+          </select>
+
+          <button type="button" id="model-select-trigger"
+            class="w-full sm:w-auto flex items-center justify-between gap-3 bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 text-[10px] rounded-lg px-4 py-3 focus:outline-none transition-colors cursor-pointer font-mono uppercase tracking-wide">
+            <span id="model-select-label">Nano Banana 2</span>
+            <i data-lucide="chevron-up" class="w-3 h-3 text-gray-500 transition-transform duration-200"
+              id="model-select-icon"></i>
+          </button>
+
+          <div id="model-select-menu"
+            class="absolute bottom-full left-0 mb-2 w-full sm:w-48 bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl py-1 hidden flex-col z-50 overflow-hidden transform origin-bottom backdrop-blur-xl">
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="google/gemini-3.1-flash-image-preview">Nano Banana 2</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="google/gemini-3-pro-image-preview">Nano Banana Pro</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="google/gemini-2.5-flash-image">Nano Banana</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="openai/gpt-5-image">GPT-5 Image</button>
+            <button type="button"
+              class="custom-option w-full text-left px-4 py-2.5 text-[10px] font-mono uppercase hover:bg-white/10 text-gray-300 transition-colors"
+              data-value="openai/gpt-5-image-mini">GPT-5 Mini</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3 flex-1 relative">
+          <!-- Prompt Input -->
+          <div class="flex-1 relative">
+            <textarea id="prompt" form="generator-form" rows="1" placeholder="Describe your image..."
+              class="w-full bg-transparent border-0 px-2 py-3 focus:ring-0 text-sm font-sans placeholder-gray-500 text-white resize-none leading-relaxed max-h-32 overflow-y-auto custom-scrollbar"
+              oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 128) + 'px'"></textarea>
+          </div>
+
+          <!-- Generate Button -->
+          <button form="generator-form" type="submit" id="generate"
+            class="shrink-0 bg-white text-black hover:bg-gray-200 p-3 rounded-xl transition-transform active:scale-95 shadow-lg shadow-white/5 hover-trigger flex items-center justify-center"
+            data-cursor="link">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- History Modal (Uploads Database) -->
+  <div id="history-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 aria-hidden=true">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="history-backdrop"></div>
+    <div
+      class="relative w-full max-w-3xl bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl flex flex-col h-[80vh] overflow-hidden modal-animate"
+      id="history-content">
+      <div class="flex items-center justify-between p-4 border-b border-white/10 shrink-0 bg-white/5">
+        <h3 class="text-sm font-mono uppercase tracking-widest text-gray-200 flex items-center gap-2">
+          <i data-lucide="history" class="w-4 h-4 text-blue-500"></i> Local Image History
+        </h3>
+        <button id="history-close" type="button" class="text-gray-500 hover:text-white transition-colors p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <div id="history-empty" class="hidden h-full flex-col items-center justify-center text-center p-8">
+          <i data-lucide="image-off" class="w-12 h-12 text-gray-700 mb-4"></i>
+          <p class="text-sm font-mono text-gray-500 uppercase tracking-widest">No previous uploads found.</p>
+        </div>
+        <div id="history-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 h-max">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+
+  <!-- Shared UI Logics -->
+  <script>
+    // Init Icons
+    lucide.createIcons();
+
+    // Smooth Scroll
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      direction: 'vertical',
+      gestureDirection: 'vertical',
+      smooth: true,
+      mouseMultiplier: 1,
+      smoothTouch: false,
+      touchMultiplier: 2,
+    });
+
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    // Mobile Menu
+    const menuBtn = document.getElementById('menu-btn');
+    const closeBtn = document.getElementById('close-menu');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    if (menuBtn) {
+      menuBtn.addEventListener('click', () => {
+        mobileMenu.classList.remove('translate-x-full');
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        mobileMenu.classList.add('translate-x-full');
+      });
+    }
+
+    // Progress Bar
+    window.addEventListener('scroll', () => {
+      const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+      const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      const scrolled = (winScroll / height) * 100;
+      document.querySelector(".progress-bar").style.width = scrolled + "%";
+    });
+
+    // Form Animation on Load
+    gsap.from(".glass-panel", {
+      y: 50,
+      opacity: 0,
+      duration: 1,
+      ease: "power3.out",
+      delay: 0.2
+    });
+
+    // ─── Collapsible Sections ─────────────────────────────────────────
+    document.querySelectorAll('[data-toggle-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sectionName = btn.dataset.toggleSection;
+        const section = document.querySelector(`.settings-section[data-section="${sectionName}"]`);
+        if (!section) return;
+        section.classList.toggle('collapsed');
+      });
+    });
+
+    // ─── Clear Gallery ────────────────────────────────────────────────
+    const clearGalleryBtn = document.getElementById('clear-gallery');
+    if (clearGalleryBtn) {
+      clearGalleryBtn.addEventListener('click', () => {
+        const galleryGrid = document.getElementById('gallery-grid');
+        const galleryEmpty = document.getElementById('gallery-empty');
+        const imageCount = document.getElementById('image-count');
+        if (galleryGrid) galleryGrid.innerHTML = '';
+        if (galleryEmpty) galleryEmpty.style.display = 'flex';
+        if (imageCount) imageCount.textContent = '0';
+      });
+    }
+
+  </script>
+
+  <!-- Additional Styles Override -->
+  <style>
+    /* Custom Styles for Futuristic Feel */
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .noise-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9000;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    .grid-bg {
+      background-size: 40px 40px;
+      mask-image: radial-gradient(circle at center, black, transparent 80%);
+      -webkit-mask-image: radial-gradient(circle at center, black, transparent 80%);
+    }
+
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: white;
+      width: 0%;
+      z-index: 10000;
+    }
+
+    /* Drag & Drop Styles */
+    .drop-zone.drag-over {
+      border-color: white;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .preview-single img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Custom Scrollbar for Sidebar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* ─── Collapsible Settings Sections ─── */
+    .settings-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 6px 0;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: inherit;
+    }
+
+    .settings-section-header:hover span {
+      color: #ccc !important;
+    }
+
+    .settings-section-body {
+      overflow: hidden;
+      max-height: 1000px;
+      transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s ease;
+      opacity: 1;
+      margin-top: 10px;
+    }
+
+    .settings-section.collapsed .settings-section-body {
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+    }
+
+    .settings-section.collapsed .section-chevron {
+      transform: rotate(-90deg);
+    }
+
+    /* ─── Horizontal Feature Tabs ─── */
+    #feature-tabs .tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.7rem;
+    }
+  </style>
+</body>
+
+</html>
