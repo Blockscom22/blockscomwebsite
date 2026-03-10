@@ -92,11 +92,31 @@ sudo systemctl reload nginx
 
 ## 6. TLS
 
-After DNS points to the server, install HTTPS with Certbot:
+After DNS points to the server, install HTTPS with Certbot.
+
+If you want both the main site and `tiktok.ramilflaviano.art` covered by the same certificate, run:
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot --nginx --cert-name blockscom.xyz \
+  -d blockscom.xyz \
+  -d www.blockscom.xyz \
+  -d tiktok.ramilflaviano.art
+```
+
+If `blockscom.xyz` already has a certificate and you are adding the subdomain later, expand it explicitly:
+
+```bash
+sudo certbot --nginx --cert-name blockscom.xyz --expand \
+  -d blockscom.xyz \
+  -d www.blockscom.xyz \
+  -d tiktok.ramilflaviano.art
+```
+
+If `tiktok.ramilflaviano.art` should use a separate certificate instead, use:
+
+```bash
+sudo certbot --nginx -d tiktok.ramilflaviano.art
 ```
 
 ## 7. Verify
