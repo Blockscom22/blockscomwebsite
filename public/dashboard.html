@@ -886,7 +886,7 @@
 
     <div class="nav-group">
       <div class="nav-label">Image & Video Generation</div>
-      <div class="nav-item" id="nav-studio" onclick="showView('studio')">Image and Video Generation</div>
+      <div class="nav-item" id="nav-studio" onclick="openStudioPage()">Image and Video Generation</div>
     </div>
 
     <div class="nav-group">
@@ -1113,11 +1113,15 @@
     <div id="view-studio" class="view-section" style="display:none">
       <div class="header">
         <h1>Image and Video Generation</h1>
-        <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">Shared Blockscom login and credits for AI image and video generation</p>
+        <p style="color:var(--text-dim); font-size:0.9rem; margin-top:4px">The studio now opens as a full dedicated page instead of an embedded iframe.</p>
       </div>
-      <iframe id="studio-iframe" src="/studio/index.html"
-        style="width:100%; height:calc(100vh - 180px); border:none; border-radius:16px; background:var(--surface);"
-        allow="clipboard-write" loading="lazy"></iframe>
+      <div class="card" style="padding:32px; text-align:center; max-width:760px;">
+        <h2 style="margin-bottom:12px">Open Full Studio</h2>
+        <p style="color:var(--text-dim); font-size:0.95rem; line-height:1.6; margin-bottom:24px;">
+          Image and video generation now runs as its own full-page workspace so it keeps the original studio layout intact.
+        </p>
+        <button class="btn btn-primary" type="button" onclick="openStudioPage()">Open Image & Video Studio</button>
+      </div>
     </div>
 
     <!-- View: Activity Logs -->
@@ -1780,6 +1784,10 @@
       showView(getLastAutomationView());
     }
 
+    function openStudioPage() {
+      window.location.href = '/studio/index.html?return=' + encodeURIComponent('/dashboard');
+    }
+
     function syncAutomationShell(view) {
       const isAutomation = isAutomationView(view);
       const automationShell = document.getElementById('automation-shell');
@@ -2256,6 +2264,11 @@
         view = 'pages';
       }
 
+      if (view === 'studio') {
+        openStudioPage();
+        return;
+      }
+
       // Close sidebar on mobile after selecting a page
       document.querySelector('.sidebar').classList.remove('open');
 
@@ -2287,9 +2300,6 @@
       if (view === 'pages') loadPages();
       if (view === 'products') loadInvTables();
       if (view === 'images') loadImages();
-      if (view === 'studio') {
-        postStudioContext();
-      }
     }
 
     // Sync auth and credits with the studio iframe

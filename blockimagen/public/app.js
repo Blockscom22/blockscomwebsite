@@ -4,11 +4,13 @@ const ANALYSIS_MODEL = 'openai/gpt-5.4';
 // API key is now managed server-side only — never expose secrets in client code.
 
 // ─── Auth token from parent dashboard (iframe mode) ───
+const isEmbeddedStudio = window.parent !== window;
 let studioProfile = null;
 let parentAuthToken = null;
+let standaloneSupabase = null;
 
 const postToParent = (payload) => {
-  if (window.parent === window) return;
+  if (!isEmbeddedStudio) return;
   window.parent.postMessage(payload, window.location.origin);
 };
 
@@ -32,7 +34,7 @@ window.addEventListener('message', (event) => {
   }
 });
 
-if (window.parent !== window) {
+if (isEmbeddedStudio) {
   document.body.classList.add('embedded-dashboard');
   postToParent({ type: 'REQUEST_AUTH' });
 }
@@ -364,6 +366,7 @@ const galleryEmpty = document.getElementById('gallery-empty');
 const imageCount = document.getElementById('image-count');
 const statusEl = document.getElementById('status');
 const creditBalanceEl = document.getElementById('credit-balance');
+const studioBackLink = document.getElementById('studio-back-link');
 const errorEl = document.getElementById('error');
 const surpriseBtn = document.getElementById('surprise-btn');
 const clearBtn = document.getElementById('clear');
@@ -1981,10 +1984,10 @@ const buildHeaders = () => {
     headers['Authorization'] = `Bearer ${parentAuthToken}`;
     return headers;
   }
-  if (window.parent !== window) {
+  if (isEmbeddedStudio) {
     throw new Error('Blockscom session is still syncing. Wait a second and try again.');
   }
-  return headers;
+  throw new Error('Your Blockscom session is missing. Sign in again and reload the studio page.');
 };
 
 const updateCreditBalance = (credits) => {
@@ -1992,7 +1995,7 @@ const updateCreditBalance = (credits) => {
 
   const numericCredits = Number(credits);
   if (!Number.isFinite(numericCredits)) {
-    creditBalanceEl.textContent = window.parent !== window ? 'Syncing...' : 'Standalone';
+    creditBalanceEl.textContent = isEmbeddedStudio ? 'Syncing...' : 'Loading...';
     return;
   }
 
@@ -2006,6 +2009,54 @@ const applyStudioResponseMeta = (data) => {
   studioProfile = { ...(studioProfile || {}), credits: numericCredits };
   updateCreditBalance(numericCredits);
   postToParent({ type: 'STUDIO_CREDITS_UPDATED', credits: numericCredits });
+};
+
+const applyStudioProfile = (profile) => {
+  if (!profile) return;
+  studioProfile = { ...(studioProfile || {}), ...profile };
+  updateCreditBalance(studioProfile.credits);
+};
+
+const loadStandaloneStudioContext = async () => {
+  if (isEmbeddedStudio) return;
+  if (!window.supabase?.createClient || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+    if (creditBalanceEl) creditBalanceEl.textContent = 'Auth Error';
+    throw new Error('Supabase client config is missing on the studio page.');
+  }
+
+  if (!standaloneSupabase) {
+    standaloneSupabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  }
+
+  const syncSession = async (session) => {
+    if (!session?.access_token) {
+      window.location.href = '/login';
+      return;
+    }
+
+    parentAuthToken = session.access_token;
+    const meResponse = await fetch('/api/me', {
+      headers: { 'Authorization': `Bearer ${parentAuthToken}` }
+    });
+
+    if (!meResponse.ok) {
+      window.location.href = '/login';
+      return;
+    }
+
+    const profile = await meResponse.json();
+    applyStudioProfile(profile);
+    await loadStudioMediaGallery({ force: true });
+  };
+
+  const { data } = await standaloneSupabase.auth.getSession();
+  await syncSession(data?.session || null);
+
+  standaloneSupabase.auth.onAuthStateChange((_event, session) => {
+    syncSession(session).catch((error) => {
+      console.error('Failed to sync standalone studio session.', error);
+    });
+  });
 };
 
 const extractTextContent = (content) => {
@@ -4425,7 +4476,16 @@ renderRecreateEditor();
 renderVideoStartPreview();
 renderVideoEndPreview();
 renderVideoPromptPlan(videoState.promptPlan);
+if (studioBackLink && !isEmbeddedStudio) {
+  const urlParams = new URLSearchParams(window.location.search);
+  studioBackLink.href = urlParams.get('return') || '/dashboard';
+  studioBackLink.classList.remove('hidden');
+  studioBackLink.classList.add('inline-flex');
+}
 setActiveFeature(activeFeature);
+loadStandaloneStudioContext().catch((error) => {
+  console.error('Failed to initialize standalone studio context.', error);
+});
 
 // --- Custom Model Select Logic ---
 const customModelWrapper = document.getElementById('custom-model-wrapper');
